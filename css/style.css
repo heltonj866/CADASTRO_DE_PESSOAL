@@ -1,0 +1,266 @@
+:root {
+            /* COR PRINCIPAL: Azul Turquesa Profundo (Teal) 
+               Usamos um tom mais fechado para o texto branco ficar legível */
+            --army-green: #368fe2;
+
+            /* COR ESCURA: Para o gradiente do fundo de login */
+            --army-dark: #368fe2;
+
+            /* COR DE DESTAQUE: Um turquesa mais vibrante/claro */
+            --eng-accent: #368fe2;
+        }
+
+        /* Ajustes visuais extras para o Turquesa */
+        .btn-success {
+            background-color: var(--army-green);
+            border-color: var(--army-green);
+        }
+
+        .btn-success:hover {
+            background-color: var(--army-dark);
+            border-color: var(--army-dark);
+        }
+
+        .text-success {
+            color: var(--army-green) !important;
+        }
+
+        .cnh-tag {
+            background-color: var(--eng-accent);
+            color: white;
+            font-weight: bold;
+        }
+
+        /* Ajuste do cabeçalho de leitura para combinar */
+        .modal-leitura-header {
+            background-color: var(--army-green);
+            color: white;
+        }
+
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Login */
+        .login-container {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--army-green), var(--army-dark));
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 2rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Navbar e Layout */
+        .main-header {
+            background-color: var(--army-green);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .search-card {
+            border-top: 5px solid #cfa832;
+        }
+
+        /* Abas Pesquisa */
+        .search-tabs .nav-link {
+            color: #555;
+            border-radius: 0;
+        }
+
+        .search-tabs .nav-link.active {
+            background-color: #f8f9fa;
+            color: var(--army-green);
+            font-weight: bold;
+            border-bottom: 3px solid var(--army-green);
+        }
+
+        /* Forms e Cards */
+        .nav-tabs .nav-link.active {
+            color: var(--army-green);
+            border-top: 3px solid var(--army-green);
+            font-weight: bold;
+        }
+
+        .foto-preview {
+            width: 150px;
+            height: 200px;
+            border: 2px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #eee;
+            margin-bottom: 10px;
+            object-fit: cover;
+        }
+
+        /* Cards Interativos */
+        .militar-card {
+            transition: all 0.3s;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .militar-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .militar-photo-box {
+            height: 180px;
+            background-color: #e9ecef;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 3px solid var(--army-green);
+        }
+
+        /* Badges e Tags */
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .status-analise {
+            background-color: #ffc107;
+            color: #000;
+        }
+
+        .status-ok {
+            background-color: #198754;
+            color: #fff;
+        }
+
+        .cnh-tag {
+            font-size: 0.75rem;
+            background: var(--eng-accent);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* Homologação */
+        .homologacao-box {
+            background-color: #f0fff4;
+            border: 2px solid #198754;
+            padding: 15px;
+            border-radius: 8px;
+            animation: pulseBorder 2s infinite;
+        }
+
+        @keyframes pulseBorder {
+            0% {
+                border-color: #198754;
+            }
+
+            50% {
+                border-color: #a3cfbb;
+            }
+
+            100% {
+                border-color: #198754;
+            }
+        }
+
+        /* Modal Leitura (User Comum) */
+        .modal-leitura-header {
+            background-color: var(--eng-accent);
+            color: white;
+        }
+
+        .readonly-label {
+            font-size: 0.8rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .readonly-value {
+            font-size: 1.1rem;
+            font-weight: 500;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        /* =========================================
+   CONFIGURAÇÃO DE IMPRESSÃO (A4)
+   ========================================= */
+/* =========================================
+   CONFIGURAÇÃO DE IMPRESSÃO (CORRIGIDA)
+   ========================================= */
+@media print {
+    /* 1. Esconde TODOS os elementos da página primeiro */
+    body > * {
+        display: none !important;
+    }
+
+    /* 2. Força o Modal a ficar visível */
+    /* Importante: O Modal é filho direto do body, então precisamos garantir que ele apareça */
+    body > #modalVisualizar {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background-color: white !important;
+    }
+
+    /* 3. Garante que o conteúdo do modal esteja visível e resetado */
+    #modalVisualizar .modal-dialog {
+        margin: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    #modalVisualizar .modal-content {
+        border: none !important;
+        box-shadow: none !important;
+    }
+
+    /* 4. Esconde os botões de ação (Fechar/Imprimir) na folha */
+    .modal-footer, .btn-close {
+        display: none !important;
+    }
+
+    /* 5. Ajuste de cores para economia de tinta */
+    .modal-header {
+        background-color: white !important;
+        color: black !important;
+        border-bottom: 2px solid #000 !important;
+    }
+    
+    .text-white {
+        color: black !important;
+    }
+
+    /* 6. Remove fundo cinza do modal-backdrop se ele aparecer */
+    .modal-backdrop {
+        display: none !important;
+    }
+    
+    /* 7. Garante fundo branco total */
+    body, html {
+        background-color: white !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+}
