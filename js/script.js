@@ -10,7 +10,7 @@ let currentUserRole = '';
 console.log("✅ Sistema Carregado: Versão Final Corrigida");
 
 // --- 1. MÁSCARAS ---
-document.addEventListener('input', function(e) {
+document.addEventListener('input', function (e) {
     if (!e.target || !e.target.name) return;
     const el = e.target;
     if (['cpf', 'new_user_idt', 'usuario', 'identidade'].includes(el.name)) {
@@ -36,13 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Listener para Salvar (apenas quando o botão salvar existe e está habilitado)
     const formMilitar = document.getElementById('militaryForm');
     if (formMilitar) {
-        formMilitar.addEventListener('submit', function(e) {
+        formMilitar.addEventListener('submit', function (e) {
             e.preventDefault();
             // Verifica se o botão de salvar está visível/ativo (para não salvar se for S2 clicando enter)
             const btnSave = document.querySelector('#formFooterButtons button[type="submit"]');
-            
+
             // Só salva se o botão de salvar existir (Admin/Sargenteação)
-            if(btnSave) {
+            if (btnSave) {
                 if (!this.checkValidity()) {
                     e.stopPropagation();
                     Swal.fire('Atenção', 'Preencha os campos obrigatórios!', 'warning');
@@ -54,49 +54,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const tabNovo = document.querySelector('button[data-bs-target="#tab-novo"]');
-    if(tabNovo) tabNovo.addEventListener('click', resetarFormularioUsuario);
+    if (tabNovo) tabNovo.addEventListener('click', resetarFormularioUsuario);
 });
 
 // --- 3. FUNÇÕES PRINCIPAIS ---
 function getEl(k) { return document.getElementById(k) || document.querySelector(`[name="${k}"]`); }
-function setVal(k, v) { const el = getEl(k); if(el) el.value = v || ''; }
+function setVal(k, v) { const el = getEl(k); if (el) el.value = v || ''; }
 
 // LOGIN
 async function handleLogin(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
-    const txt = btn.innerText; btn.innerText="Verificando..."; btn.disabled=true;
+    const txt = btn.innerText; btn.innerText = "Verificando..."; btn.disabled = true;
     try {
         const fd = new FormData(e.target);
         const res = await fetch('backend/login.php', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body:JSON.stringify({identidade:fd.get('usuario'), senha:e.target.querySelectorAll('input')[1].value})
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ identidade: fd.get('usuario'), senha: e.target.querySelectorAll('input')[1].value })
         });
         const json = await res.json();
-        if(json.status==='sucesso') {
+        if (json.status === 'sucesso') {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.remove('hidden');
-            currentUserRole = json.role;
+
+            // --- CORREÇÃO IMPORTANTE: GRAVA A ROLE ---
+            window.currentUserRole = json.role;
+            localStorage.setItem('sismil_role', json.role); // <--- OBRIGATÓRIO
+            window.location.reload();
+            // -----------------------------------------
+
             aplicarPermissoes(json.role);
             atualizarDashboard();
         } else Swal.fire('Erro', json.msg, 'error');
-    } catch(err){console.error(err);} finally{btn.innerText=txt;btn.disabled=false;}
+    } catch (err) { console.error(err); } finally { btn.innerText = txt; btn.disabled = false; }
 }
 
 // SALVAR (Admin/Sargenteação)
 async function salvarMilitar() {
     const fd = new FormData(document.getElementById('militaryForm'));
     const chk = document.getElementById('homologado');
-    if(chk) fd.append('homologado', chk.checked ? '1' : '0');
-    
+    if (chk) fd.append('homologado', chk.checked ? '1' : '0');
+
     const btn = document.querySelector('#militaryForm button[type="submit"]');
-    if(btn) { btn.innerText='Salvando...'; btn.disabled=true; }
+    if (btn) { btn.innerText = 'Salvando...'; btn.disabled = true; }
 
     try {
-        const res = await fetch('backend/save_militar.php', {method:'POST', body:fd});
+        const res = await fetch('backend/save_militar.php', { method: 'POST', body: fd });
         const json = await res.json();
-        
-        if(json.status==='sucesso') {
+
+        if (json.status === 'sucesso') {
             Swal.fire({
                 title: 'Sucesso!',
                 text: 'Dados salvos corretamente.',
@@ -108,30 +114,30 @@ async function salvarMilitar() {
             limparFormulario();     // Limpa/Fecha o form
             atualizarDashboard();   // Atualiza os números lá em cima
             atualizarListagem();    // <--- O PULO DO GATO: Atualiza a tabela
-            
+
         } else {
             Swal.fire('Erro', json.msg, 'error');
         }
-    } catch(e){
+    } catch (e) {
         console.error(e);
-        Swal.fire('Erro','Falha técnica ao salvar.','error');
-    } finally { 
-        if(btn) { btn.innerText='Salvar Dados'; btn.disabled=false; } 
+        Swal.fire('Erro', 'Falha técnica ao salvar.', 'error');
+    } finally {
+        if (btn) { btn.innerText = 'Salvar Dados'; btn.disabled = false; }
     }
 }
 
 // --- CORE: CARREGAR DADOS NA FICHA ---
 async function carregarMilitarNoForm(id, modo) {
     // 1. Reset visual
-    limparFormulario(); 
-    
+    limparFormulario();
+
     try {
         const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
         const json = await res.json();
-        if(json.status !== 'sucesso') throw new Error(json.msg);
-        
+        if (json.status !== 'sucesso') throw new Error(json.msg);
+
         const d = json.dados;
-        
+
         // 2. Preenchimento de Campos
         setVal('militarId', d.id);
         setVal('cpf', d.identidade); setVal('posto_grad', d.posto_grad); setVal('numero', d.numero);
@@ -149,10 +155,10 @@ async function carregarMilitarNoForm(id, modo) {
 
         // Checkbox Visual (apenas visual)
         const chkHomolog = document.getElementById('homologado');
-        if(chkHomolog) chkHomolog.checked = (d.homologado == 1);
+        if (chkHomolog) chkHomolog.checked = (d.homologado == 1);
         atualizarBadgeVisual(d.homologado == 1);
-        
-        if(d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
+
+        if (d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
 
         // 3. Exibir o Formulário
         document.getElementById('fullRegistrationCard').classList.remove('hidden');
@@ -175,19 +181,19 @@ async function carregarMilitarNoForm(id, modo) {
             </div>
         `;
 
-        if(ehS2) {
+        if (ehS2) {
             // --- MODO S2: INSPEÇÃO E HOMOLOGAÇÃO ---
-            badge.innerText = "Inspeção Veicular (S2)"; 
+            badge.innerText = "Inspeção Veicular (S2)";
             badge.className = "badge bg-warning text-dark";
-            
+
             // Foca na aba de veículos automaticamente
-            try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if(tab) new bootstrap.Tab(tab).show(); } catch(e){}
+            try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if (tab) new bootstrap.Tab(tab).show(); } catch (e) { }
 
             // Monta os botões Especiais do S2
             let buttonsS2 = `<div class="w-100 d-flex justify-content-between align-items-center">`;
             buttonsS2 += `<button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button>`;
             buttonsS2 += `<div>`;
-            
+
             if (d.placa && d.placa.trim() !== "") {
                 if (d.homologado == 1) {
                     // JÁ HOMOLOGADO
@@ -218,27 +224,27 @@ async function carregarMilitarNoForm(id, modo) {
 
             // Bloqueia edição de campos para o S2 (apenas leitura)
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
-            inputs.forEach(el => el.setAttribute('readonly', true)); 
+            inputs.forEach(el => el.setAttribute('readonly', true));
             // Para selects, o readonly não funciona bem em alguns browsers, então desabilitamos o pointer events ou usamos disabled
             document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'none');
 
         } else {
             // --- MODO ADMIN/SARGENTEAÇÃO ---
-            badge.innerText = "Edição de Cadastro"; 
+            badge.innerText = "Edição de Cadastro";
             badge.className = "badge bg-primary";
             footerBtns.innerHTML = htmlButtonsPadrao;
-            
+
             // Destrava campos
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
             inputs.forEach(el => el.removeAttribute('readonly'));
             document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'auto');
-            
-            if(getEl('cpf')) getEl('cpf').setAttribute('readonly', true); // CPF nunca muda
+
+            if (getEl('cpf')) getEl('cpf').setAttribute('readonly', true); // CPF nunca muda
         }
 
-    } catch (e) { 
+    } catch (e) {
         console.error(e);
-        Swal.fire('Erro', 'Não foi possível carregar os dados.', 'error'); 
+        Swal.fire('Erro', 'Não foi possível carregar os dados.', 'error');
     }
 }
 
@@ -246,26 +252,26 @@ async function carregarMilitarNoForm(id, modo) {
 async function toggleHomologacaoForm(id) {
     // Removemos o "confirm" padrão chato e usamos algo mais fluido ou direto, 
     // mas se quiser manter o confirm, tudo bem. Vamos manter pela segurança.
-    if(!confirm("Confirma a alteração do status de homologação?")) return;
+    if (!confirm("Confirma a alteração do status de homologação?")) return;
 
     try {
         const res = await fetch('backend/toggle_homolog.php', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: id })
         });
         const json = await res.json();
-        
-        if(json.status === 'sucesso') {
+
+        if (json.status === 'sucesso') {
             // 1. Atualiza a ficha aberta (botoes mudam de cor na hora)
-            carregarMilitarNoForm(id, 'reload'); 
-            
+            carregarMilitarNoForm(id, 'reload');
+
             // 2. Atualiza os números do Dashboard
-            atualizarDashboard(); 
-            
+            atualizarDashboard();
+
             // 3. Atualiza a lista de pesquisa lá no fundo
-            atualizarListagem(); 
-            
+            atualizarListagem();
+
             // Opcional: Um feedback visual rápido (Toast)
             const Toast = Swal.mixin({
                 toast: true, position: 'top-end', showConfirmButton: false, timer: 2000
@@ -275,12 +281,12 @@ async function toggleHomologacaoForm(id) {
         } else {
             alert("Erro: " + json.msg);
         }
-    } catch(e) { console.error(e); alert("Erro de conexão"); }
+    } catch (e) { console.error(e); alert("Erro de conexão"); }
 }
 
 // --- BUSCA (LISTA DE CARDS) ---
 async function realizarBusca(e, tipo) {
-    if(e) e.preventDefault();
+    if (e) e.preventDefault();
     const area = document.getElementById('resultsArea');
     area.innerHTML = '<div class="text-center p-3">Buscando...</div>';
     area.classList.remove('hidden');
@@ -301,52 +307,68 @@ async function realizarBusca(e, tipo) {
         const json = await res.json();
         area.innerHTML = '';
 
-        if(json.status==='sucesso' && json.dados.length > 0) {
+        // BLINDAGEM: Pega o perfil e transforma em minúsculo (S2 vira s2, Admin vira admin)
+        let roleRaw = window.currentUserRole || localStorage.getItem('sismil_role') || 'user';
+        let role = String(roleRaw).toLowerCase().trim();
+
+        if (json.status === 'sucesso' && json.dados.length > 0) {
             document.getElementById('resultsCount').innerText = json.dados.length + " encontrados";
+
             json.dados.forEach(m => {
                 const foto = m.foto_path ? `uploads/${m.foto_path}` : 'assets/sem_foto.png';
-                
-                // 1. Botão de Ação (Depende do Perfil)
                 let btnAcao = '';
-                
-                if(['admin', 'sargenteacao'].includes(currentUserRole.toLowerCase())) {
-                    // Admin/Sarg: Editar (Azul)
+
+                // LÓGICA DE BOTÕES (Agora aceita maiúsculas e minúsculas automaticamente)
+
+                // 1. CHEFES (Admin / Sargenteação)
+                if (['admin', 'sargenteacao'].includes(role)) {
                     btnAcao = `<button class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="carregarMilitarNoForm(${m.id}, 'edit')">
                                     <i class="fas fa-edit me-1"></i> Editar
                                </button>`;
-                } 
-                else if(['s2', 'transporte'].includes(currentUserRole.toLowerCase())) {
-                    // S2: Inspecionar (Amarelo)
+                }
+                // 2. FISCALIZAÇÃO (S2 / Transporte)
+                else if (['S2', 's2', 'transporte'].includes(role)) {
                     btnAcao = `<button class="btn btn-sm btn-warning w-100 mb-1 fw-bold" onclick="carregarMilitarNoForm(${m.id}, 'homolog')">
                                     <i class="fas fa-search me-1"></i> Inspecionar
                                </button>`;
                 }
+                // 3. AUDITORIA / CONSULTA (Todo o resto)
+                else {
+                    btnAcao = `<button class="btn btn-sm btn-primary w-100 mb-1" onclick="abrirModalLeitura(${m.id})">
+                                    <i class="fas fa-eye me-1"></i> Ver Ficha
+                               </button>`;
+                }
 
-                // 2. Botão Ver Ficha (Sempre presente para todos)
-                const btnVerFicha = `<button class="btn btn-sm btn-info text-white w-100" onclick="verDetalhesMilitar(${m.id})">
-                                        <i class="fas fa-id-card me-1"></i> Ver Ficha
-                                     </button>`;
-                
+                // Botão Resumo (Sempre visível)
+                const btnResumo = `<button class="btn btn-sm btn-outline-info w-100" onclick="verDetalhesMilitar(${m.id})">
+                                        <i class="fas fa-id-card me-1"></i> Resumo
+                                   </button>`;
+
                 area.innerHTML += `
-                <div class="col-md-3">
+                <div class="col-md-3 mb-3">
                     <div class="card h-100 shadow-sm">
-                        <div style="height:200px;overflow:hidden;background:#f0f0f0;"><img src="${foto}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='assets/sem_foto.png'"></div>
+                        <div style="height:200px;overflow:hidden;background:#f0f0f0;">
+                             <img src="${foto}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='assets/sem_foto.png'">
+                        </div>
                         <div class="card-body text-center p-2">
                             <h6 class="fw-bold m-0">${m.posto_grad} ${m.nome_guerra}</h6>
                             <small class="text-muted">${m.subunidade}</small>
                             <div class="mt-2">
                                 ${btnAcao}
-                                ${btnVerFicha}
+                                ${btnResumo}
                             </div>
                         </div>
                     </div>
                 </div>`;
             });
         } else {
-            area.innerHTML = '<div class="alert alert-warning text-center">Nenhum registro.</div>';
+            area.innerHTML = '<div class="alert alert-warning text-center">Nenhum registro encontrado.</div>';
             document.getElementById('resultsCount').innerText = "0";
         }
-    } catch(err) { area.innerHTML = '<div class="alert alert-danger">Erro na busca.</div>'; }
+    } catch (err) {
+        console.error(err);
+        area.innerHTML = '<div class="alert alert-danger">Erro ao buscar dados.</div>';
+    }
 }
 
 // VISUALIZAR FICHA (Read-Only Modal)
@@ -355,15 +377,15 @@ async function verDetalhesMilitar(id) {
     try {
         const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
         const json = await res.json();
-        
+
         if (json.status === 'sucesso') {
             const d = json.dados;
             const fmt = (dt) => (dt && dt !== '0000-00-00') ? String(dt).split('-').reverse().join('/') : '---';
             const txt = (t) => (t !== null && t !== undefined && String(t).trim() !== '') ? t : '---';
-            
+
             const foto = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
             document.getElementById('visFoto').src = foto;
-            
+
             document.getElementById('visGuerra').innerText = txt(d.nome_guerra);
             document.getElementById('visPosto').innerText = txt(d.posto_grad);
             document.getElementById('visNumero').innerText = txt(d.numero);
@@ -373,32 +395,32 @@ async function verDetalhesMilitar(id) {
             document.getElementById('visNascimento').innerText = fmt(d.dt_nascimento);
             document.getElementById('visSangue').innerText = txt(d.tipo_sanguineo);
             document.getElementById('visSu').innerText = txt(d.subunidade);
-            document.getElementById('visPelotaoSecao').innerText = `${d.pelotao||''} / ${d.secao||''}`;
+            document.getElementById('visPelotaoSecao').innerText = `${d.pelotao || ''} / ${d.secao || ''}`;
             document.getElementById('visQmg').innerText = txt(d.qmg);
             document.getElementById('visDtPraca').innerText = fmt(d.dt_praca);
-            
+
             const areaCnh = document.getElementById('visAreaCnh');
             if (d.cat_cnh && String(d.cat_cnh).trim() !== '') {
                 areaCnh.classList.remove('d-none');
                 document.getElementById('visCatCnh').innerText = "Cat " + d.cat_cnh;
                 document.getElementById('visValCnh').innerText = fmt(d.validade_cnh);
             } else { areaCnh.classList.add('d-none'); }
-            
+
             new bootstrap.Modal(document.getElementById('modalVisualizar')).show();
         } else { Swal.fire("Erro", json.msg, "error"); }
-    } catch (e) { Swal.fire("Erro", "Erro técnico.", "error"); } 
+    } catch (e) { Swal.fire("Erro", "Erro técnico.", "error"); }
     finally { document.body.style.cursor = 'default'; }
 }
 
 // OUTRAS AUXILIARES
 function popularSelects() {
-    const sp=document.getElementById('selectPosto'), sc=document.getElementById('searchPosto');
-    postos.forEach(p=>{if(sp)sp.add(new Option(p,p));if(sc)sc.add(new Option(p,p))});
-    const sq=document.getElementById('selectQMG'), sqc=document.getElementById('searchQMG');
-    const add=(el)=>{for(const[g,l] of Object.entries(qmgs)){const o=document.createElement('optgroup');o.label=g;l.forEach(q=>o.appendChild(new Option(q,q)));el.appendChild(o)}};
-    if(sq)add(sq); if(sqc)add(sqc);
+    const sp = document.getElementById('selectPosto'), sc = document.getElementById('searchPosto');
+    postos.forEach(p => { if (sp) sp.add(new Option(p, p)); if (sc) sc.add(new Option(p, p)) });
+    const sq = document.getElementById('selectQMG'), sqc = document.getElementById('searchQMG');
+    const add = (el) => { for (const [g, l] of Object.entries(qmgs)) { const o = document.createElement('optgroup'); o.label = g; l.forEach(q => o.appendChild(new Option(q, q))); el.appendChild(o) } };
+    if (sq) add(sq); if (sqc) add(sqc);
 }
-function verificarSessao() { fetch('backend/check_session.php').then(r=>r.json()).then(j=>{if(j.status==='logado'){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appScreen').classList.remove('hidden');currentUserRole=j.role;aplicarPermissoes(j.role);atualizarDashboard();}})}
+function verificarSessao() { fetch('backend/check_session.php').then(r => r.json()).then(j => { if (j.status === 'logado') { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden'); currentUserRole = j.role; aplicarPermissoes(j.role); atualizarDashboard(); } }) }
 
 // APLICAR PERMISSÕES
 // APLICAR PERMISSÕES (Corrigido: Esconde cadastro para Consulta e S2)
@@ -407,39 +429,39 @@ function aplicarPermissoes(role) {
     const display = document.getElementById('displayUserRole');
     const formCard = document.getElementById('fullRegistrationCard'); // O formulário de cadastro
 
-    if(display) display.innerText = role.toUpperCase();
-    
+    if (display) display.innerText = role.toUpperCase();
+
     // Normaliza para minúsculo para evitar erros
     const r = role ? role.toLowerCase() : '';
 
     // 1. ADMIN
     if (r === 'admin') {
-        if(adminBtn) adminBtn.classList.remove('hidden');
-        if(formCard) formCard.classList.remove('hidden'); // Admin vê o cadastro sempre
-        carregarListaUsuarios(); 
-    } 
+        if (adminBtn) adminBtn.classList.remove('hidden');
+        if (formCard) formCard.classList.remove('hidden'); // Admin vê o cadastro sempre
+        carregarListaUsuarios();
+    }
     // 2. SARGENTEAÇÃO
     else if (r === 'sargenteacao') {
-        if(adminBtn) adminBtn.classList.add('hidden');
-        if(formCard) formCard.classList.remove('hidden'); // Sargenteação vê o cadastro sempre
+        if (adminBtn) adminBtn.classList.add('hidden');
+        if (formCard) formCard.classList.remove('hidden'); // Sargenteação vê o cadastro sempre
     }
     // 3. S2 e USUÁRIO COMUM (Consulta)
     else {
         // Esconde botão de admin
-        if(adminBtn) adminBtn.classList.add('hidden');
-        
+        if (adminBtn) adminBtn.classList.add('hidden');
+
         // IMPORTANTE: Esconde o formulário de cadastro inicial
         // (O S2 só verá o formulário quando clicar em "Inspecionar" na busca)
-        if(formCard) formCard.classList.add('hidden');
+        if (formCard) formCard.classList.add('hidden');
     }
 }
 
 function atualizarBadgeVisual(check) {
-    const b=document.getElementById('vehicleStatusBadge');
-    if(b){b.className=check?"status-badge status-ok":"status-badge status-analise";b.innerHTML=check?'<i class="fas fa-check-circle"></i> HOMOLOGADO':'<i class="fas fa-clock"></i> PENDENTE';}
+    const b = document.getElementById('vehicleStatusBadge');
+    if (b) { b.className = check ? "status-badge status-ok" : "status-badge status-analise"; b.innerHTML = check ? '<i class="fas fa-check-circle"></i> HOMOLOGADO' : '<i class="fas fa-clock"></i> PENDENTE'; }
 }
-function previewImage(input) { if (input.files && input.files[0]) { var reader = new FileReader(); reader.onload = function(e) { document.getElementById('imgPreview').src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
-function atualizarDashboard() { fetch('backend/dashboard_stats.php').then(r=>r.json()).then(j=>{if(j.status==='sucesso'){document.getElementById('dashMilitares').innerText=j.militares;document.getElementById('dashVeiculos').innerText=j.veiculos;document.getElementById('dashPendentes').innerText=j.pendentes;document.getElementById('dashboardPanel').classList.remove('hidden');}})}
+function previewImage(input) { if (input.files && input.files[0]) { var reader = new FileReader(); reader.onload = function (e) { document.getElementById('imgPreview').src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
+function atualizarDashboard() { fetch('backend/dashboard_stats.php').then(r => r.json()).then(j => { if (j.status === 'sucesso') { document.getElementById('dashMilitares').innerText = j.militares; document.getElementById('dashVeiculos').innerText = j.veiculos; document.getElementById('dashPendentes').innerText = j.pendentes; document.getElementById('dashboardPanel').classList.remove('hidden'); } }) }
 async function realizarLogout() { await fetch('backend/logout.php'); location.reload(); }
 
 // Gestão de Usuários (Apenas Admin)
@@ -459,33 +481,33 @@ async function carregarListaUsuarios() {
         }
     } catch (e) { console.error(e); }
 }
-async function excluirUsuario(id) { if(confirm('Apagar usuário?')) { await fetch('backend/delete_user.php',{method:'POST',body:JSON.stringify({id})}); carregarListaUsuarios(); } }
-async function criarUsuario(e) { e.preventDefault(); const fd=new FormData(document.getElementById('formCreateUser')); const url=document.getElementById('edit_id').value?'backend/update_user.php':'backend/create_user.php'; await fetch(url,{method:'POST',body:JSON.stringify(Object.fromEntries(fd))}); document.getElementById('formCreateUser').reset(); carregarListaUsuarios(); }
-function resetarFormularioUsuario() { document.getElementById('formCreateUser').reset(); document.getElementById('edit_id').value=''; document.querySelector('[name="new_user_idt"]').removeAttribute('readonly'); document.querySelector('#formCreateUser button[type="submit"]').innerHTML='<i class="fas fa-save me-1"></i> Salvar Dados'; }
-function prepararEdicao(id, p, g, s, i, r) { new bootstrap.Tab(document.querySelector('button[data-bs-target="#tab-novo"]')).show(); document.getElementById('edit_id').value=id; const f=document.forms['formCreateUser']; f.new_user_posto.value=p; f.new_user_guerra.value=g; f.new_user_subunidade.value=s; f.new_user_idt.value=i; f.new_user_role.value=r; f.new_user_idt.setAttribute('readonly',true); document.querySelector('#formCreateUser button[type="submit"]').innerHTML='<i class="fas fa-sync me-1"></i> Atualizar'; }
+async function excluirUsuario(id) { if (confirm('Apagar usuário?')) { await fetch('backend/delete_user.php', { method: 'POST', body: JSON.stringify({ id }) }); carregarListaUsuarios(); } }
+async function criarUsuario(e) { e.preventDefault(); const fd = new FormData(document.getElementById('formCreateUser')); const url = document.getElementById('edit_id').value ? 'backend/update_user.php' : 'backend/create_user.php'; await fetch(url, { method: 'POST', body: JSON.stringify(Object.fromEntries(fd)) }); document.getElementById('formCreateUser').reset(); carregarListaUsuarios(); }
+function resetarFormularioUsuario() { document.getElementById('formCreateUser').reset(); document.getElementById('edit_id').value = ''; document.querySelector('[name="new_user_idt"]').removeAttribute('readonly'); document.querySelector('#formCreateUser button[type="submit"]').innerHTML = '<i class="fas fa-save me-1"></i> Salvar Dados'; }
+function prepararEdicao(id, p, g, s, i, r) { new bootstrap.Tab(document.querySelector('button[data-bs-target="#tab-novo"]')).show(); document.getElementById('edit_id').value = id; const f = document.forms['formCreateUser']; f.new_user_posto.value = p; f.new_user_guerra.value = g; f.new_user_subunidade.value = s; f.new_user_idt.value = i; f.new_user_role.value = r; f.new_user_idt.setAttribute('readonly', true); document.querySelector('#formCreateUser button[type="submit"]').innerHTML = '<i class="fas fa-sync me-1"></i> Atualizar'; }
 function exportarParaExcel() { const tipo = document.querySelector('#searchTabs .active') ? (document.querySelector('#searchTabs .active').id === 'li-tab-cnh' ? 'cnh' : 'geral') : 'geral'; window.open(`backend/export_excel.php?tipo_busca=${tipo}`, '_blank'); }
 // Função Corrigida: Fecha a ficha com segurança
 function limparFormulario() {
     const form = document.getElementById('militaryForm');
-    if(form) form.reset();
-    
+    if (form) form.reset();
+
     // Limpa campos específicos com verificação de existência
-    if(document.getElementById('militarId')) document.getElementById('militarId').value='';
-    if(document.getElementById('imgPreview')) document.getElementById('imgPreview').src='assets/sem_foto.png';
-    
+    if (document.getElementById('militarId')) document.getElementById('militarId').value = '';
+    if (document.getElementById('imgPreview')) document.getElementById('imgPreview').src = 'assets/sem_foto.png';
+
     // --- CORREÇÃO DO ERRO ---
     // Só tenta esconder o botão Excluir SE ele existir na tela
     const btnExcluir = document.getElementById('btnExcluir');
-    if(btnExcluir) btnExcluir.classList.add('d-none');
+    if (btnExcluir) btnExcluir.classList.add('d-none');
     // ------------------------
 
     // Esconde o card principal
     const card = document.getElementById('fullRegistrationCard');
-    if(card) card.classList.add('hidden'); 
-    
+    if (card) card.classList.add('hidden');
+
     // Restaura botões padrão (Admin/Sargenteação) para a próxima vez
     const footerBtns = document.getElementById('formFooterButtons');
-    if(footerBtns) {
+    if (footerBtns) {
         footerBtns.innerHTML = `
             <button type="button" id="btnExcluir" class="btn btn-outline-danger d-none" onclick="excluirMilitar()">
                 <i class="fas fa-trash-alt me-1"></i> Excluir Cadastro
@@ -498,10 +520,10 @@ function limparFormulario() {
             </div>
         `;
     }
-    
+
     // Opcional: Rola a tela de volta para o topo ou para a busca
     const resultsArea = document.getElementById('resultsArea');
-    if(resultsArea && !resultsArea.classList.contains('hidden')) {
+    if (resultsArea && !resultsArea.classList.contains('hidden')) {
         resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
@@ -514,13 +536,13 @@ function imprimirSelo(id) {
 // Função auxiliar para atualizar a lista sem recarregar a página
 function atualizarListagem() {
     const areaResultados = document.getElementById('resultsArea');
-    
+
     // Só atualiza se a lista de resultados estiver visível
     if (areaResultados && !areaResultados.classList.contains('hidden')) {
         // Verifica qual aba está ativa (Geral ou CNH)
         const tabCnh = document.getElementById('tab-cnh');
         const tipo = (tabCnh && tabCnh.classList.contains('active')) ? 'cnh' : 'geral';
-        
+
         // Chama a busca novamente silenciosamente (passando null no evento)
         realizarBusca(null, tipo);
     }
@@ -528,7 +550,7 @@ function atualizarListagem() {
 
 async function excluirMilitar() {
     const id = document.getElementById('militarId').value;
-    if(!id) return;
+    if (!id) return;
 
     const result = await Swal.fire({
         title: 'Tem certeza?',
@@ -545,12 +567,12 @@ async function excluirMilitar() {
         try {
             const res = await fetch('backend/delete_militar.php', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: id })
             });
             const json = await res.json();
 
-            if(json.status === 'sucesso') {
+            if (json.status === 'sucesso') {
                 Swal.fire('Excluído!', 'O registro foi removido.', 'success');
                 limparFormulario();
                 atualizarDashboard();
@@ -558,8 +580,88 @@ async function excluirMilitar() {
             } else {
                 Swal.fire('Erro', json.msg, 'error');
             }
-        } catch(e) {
+        } catch (e) {
             Swal.fire('Erro', 'Erro de conexão.', 'error');
         }
+    }
+}
+
+// FUNÇÃO NOVA: Preenche o modal de leitura
+async function abrirModalLeitura(id) {
+    // Feedback de carregamento
+    document.body.style.cursor = 'wait';
+
+    try {
+        const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
+        const json = await res.json();
+
+        if (json.status === 'sucesso') {
+            const d = json.dados;
+
+            // Funções auxiliares de formatação
+            const txt = (v) => (v && v !== 'null' && String(v).trim() !== '') ? v : '---';
+            const data = (dt) => (dt && dt.length === 10) ? dt.split('-').reverse().join('/') : '---';
+
+            // 1. Cabeçalho
+            document.getElementById('f_foto').src = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
+            document.getElementById('f_posto').innerText = txt(d.posto_grad);
+            document.getElementById('f_guerra').innerText = txt(d.nome_guerra);
+            document.getElementById('f_nome_completo').innerText = txt(d.nome_completo);
+            document.getElementById('f_su').innerText = txt(d.subunidade);
+            document.getElementById('f_secao').innerText = txt(d.pelotao) + (d.secao ? ` / ${d.secao}` : '');
+            document.getElementById('f_qmg').innerText = txt(d.qmg);
+
+            // 2. Dados Pessoais
+            document.getElementById('f_cpf').innerText = txt(d.identidade);
+            document.getElementById('f_idt').innerText = txt(d.idt_militar);
+            document.getElementById('f_numero').innerText = txt(d.numero);
+            document.getElementById('f_nasc').innerText = data(d.dt_nascimento);
+            document.getElementById('f_sangue').innerText = txt(d.tipo_sanguineo);
+            document.getElementById('f_praca').innerText = data(d.dt_praca);
+
+            // 3. Contato e Endereço
+            document.getElementById('f_cel1').innerText = txt(d.celular_princ);
+            document.getElementById('f_cel2').innerText = txt(d.celular_sec);
+            document.getElementById('f_email').innerText = txt(d.email);
+
+            document.getElementById('f_end').innerText = txt(d.endereco);
+            document.getElementById('f_end_num').innerText = txt(d.num_residencia);
+            document.getElementById('f_bairro').innerText = txt(d.bairro);
+            document.getElementById('f_cidade').innerText = `${txt(d.cidade)} - ${txt(d.estado)}`;
+            document.getElementById('f_cep').innerText = txt(d.cep);
+
+            document.getElementById('f_resp_nome').innerText = txt(d.nome_resp);
+            document.getElementById('f_resp_tel').innerText = txt(d.tel_resp);
+
+            // 4. Trânsito
+            document.getElementById('f_cnh_cat').innerText = txt(d.cat_cnh);
+            document.getElementById('f_cnh_val').innerText = data(d.validade_cnh);
+            document.getElementById('f_crlv').innerText = data(d.validade_crlv);
+
+            document.getElementById('f_placa').innerText = txt(d.placa);
+            document.getElementById('f_modelo').innerText = txt(d.modelo);
+            document.getElementById('f_cor').innerText = txt(d.cor);
+
+            // Badge de Status
+            const badge = document.getElementById('f_status');
+            if (d.placa && d.placa.length > 2) {
+                badge.innerHTML = d.homologado == 1
+                    ? '<span class="badge bg-success">LIBERADO</span>'
+                    : '<span class="badge bg-warning text-dark">PENDENTE S2</span>';
+            } else {
+                badge.innerHTML = '<span class="badge bg-light text-muted border">S/ VEÍCULO</span>';
+            }
+
+            // Exibir Modal
+            new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
+
+        } else {
+            alert("Erro: " + json.msg);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Erro de conexão ao buscar dados.");
+    } finally {
+        document.body.style.cursor = 'default';
     }
 }

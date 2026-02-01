@@ -34,7 +34,34 @@
                 </div>
                 <button type="submit" class="btn btn-success w-100"
                     style="background-color: var(--army-green);">Entrar</button>
+                <button type="button" class="btn btn-outline-secondary w-100 mt-2" onclick="togglePublico(true)">
+                    <i class="fas fa-search me-1"></i> Consulta Pública
+                </button>
             </form>
+        </div>
+    </div>
+
+    <div id="screenPublic" class="hidden"
+        style="position:fixed; top:0; left:0; width:100%; height:100%; background:#f8f9fa; z-index:9999; overflow-y:auto; padding:20px;">
+        <div class="container" style="max-width: 800px;">
+            <div class="text-center mb-4">
+                <h4 class="fw-bold text-secondary">Consulta Pública</h4>
+                <button class="btn btn-sm btn-dark mt-2" onclick="togglePublico(false)">
+                    <i class="fas fa-arrow-left me-1"></i> Voltar ao Login
+                </button>
+            </div>
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form onsubmit="busPublica(event)" class="d-flex gap-2">
+                        <input type="text" id="iptPublic" class="form-control form-control-lg"
+                            placeholder="Nome de guerra, Placa ou Modelo..." required>
+                        <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-search"></i></button>
+                    </form>
+                </div>
+            </div>
+
+            <div id="resPublic" class="row g-3"></div>
         </div>
     </div>
 
@@ -381,21 +408,24 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="formFooterButtons" class="mt-4 pt-3 pb-3 px-2 border-top d-flex justify-content-between align-items-center">
-        
-        <button type="button" id="btnExcluir" class="btn btn-outline-danger d-none" onclick="excluirMilitar()">
-            <i class="fas fa-trash-alt me-1"></i> Excluir Cadastro
-        </button>
+                        <div id="formFooterButtons"
+                            class="mt-4 pt-3 pb-3 px-2 border-top d-flex justify-content-between align-items-center">
 
-        <div>
-            <button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Limpar</button>
-            <button type="submit" class="btn btn-success">
-                <i class="fas fa-save me-1"></i> Salvar Dados
-            </button>
-        </div>
+                            <button type="button" id="btnExcluir" class="btn btn-outline-danger d-none"
+                                onclick="excluirMilitar()">
+                                <i class="fas fa-trash-alt me-1"></i> Excluir Cadastro
+                            </button>
 
-    </div>
-</form>
+                            <div>
+                                <button type="button" class="btn btn-outline-secondary me-2"
+                                    onclick="limparFormulario()">Limpar</button>
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-save me-1"></i> Salvar Dados
+                                </button>
+                            </div>
+
+                        </div>
+                    </form>
                     </form>
                 </div>
             </div>
@@ -517,145 +547,428 @@
     </div>
 
     <div class="modal fade" id="modalUsuarios" tabindex="-1" aria-hidden="true" style="z-index: 1060;">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content shadow-lg border-0">
-            
-            <div class="modal-header text-white" style="background-color: var(--army-dark);">
-                <h5 class="modal-title"><i class="fas fa-user-shield me-2"></i>Gestão de Acesso (IAM)</h5>
-                <div class="ms-auto me-3">
-                    <a href="backend/backup.php" target="_blank" class="btn btn-warning btn-sm fw-bold">
-                        <i class="fas fa-cloud-download-alt me-1"></i> Backup BD
-                    </a>
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content shadow-lg border-0">
+
+                <div class="modal-header text-white" style="background-color: var(--army-dark);">
+                    <h5 class="modal-title"><i class="fas fa-user-shield me-2"></i>Gestão de Acesso (IAM)</h5>
+                    <div class="ms-auto me-3">
+                        <a href="backend/backup.php" target="_blank" class="btn btn-warning btn-sm fw-bold">
+                            <i class="fas fa-cloud-download-alt me-1"></i> Backup BD
+                        </a>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
 
-            <div class="modal-body p-0">
-                <ul class="nav nav-tabs nav-fill" id="adminTabs" role="tablist">
-                    <li class="nav-item">
-                        <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-novo" type="button">
-                            <i class="fas fa-plus-circle me-1"></i> Novo Usuário
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-lista" type="button" onclick="carregarListaUsuarios()">
-                            <i class="fas fa-list me-1"></i> Usuários Existentes
-                        </button>
-                    </li>
-                </ul>
+                <div class="modal-body p-0">
+                    <ul class="nav nav-tabs nav-fill" id="adminTabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-novo"
+                                type="button">
+                                <i class="fas fa-plus-circle me-1"></i> Novo Usuário
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-lista"
+                                type="button" onclick="carregarListaUsuarios()">
+                                <i class="fas fa-list me-1"></i> Usuários Existentes
+                            </button>
+                        </li>
+                    </ul>
 
-                <div class="tab-content p-4">
-                    
-                    <div class="tab-pane fade show active" id="tab-novo">
-                        <form id="formCreateUser" class="needs-validation" onsubmit="criarUsuario(event)">
-                            <input type="hidden" name="edit_id" id="edit_id">
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <h6 class="text-muted border-bottom pb-2">Identificação Militar</h6>
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label small fw-bold">Posto/Grad</label>
-                                    <select name="new_user_posto" class="form-select form-select-sm" required>
-                                        <option value="">Selecione...</option>
-                                        <option value="Cel">Coronel</option>
-                                        <option value="Ten Cel">Ten Cel</option>
-                                        <option value="Maj">Major</option>
-                                        <option value="Cap">Capitão</option>
-                                        <option value="1º Ten">1º Ten</option>
-                                        <option value="2º Ten">2º Ten</option>
-                                        <option value="Asp">Aspirante</option>
-                                        <option value="Sub Ten">Sub Ten</option>
-                                        <option value="1º Sgt">1º Sgt</option>
-                                        <option value="2º Sgt">2º Sgt</option>
-                                        <option value="3º Sgt">3º Sgt</option>
-                                        <option value="Cb">Cabo</option>
-                                        <option value="Sd">Soldado</option>
-                                        <option value="SC">Servidor Civil</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-8">
-                                    <label class="form-label small fw-bold">Nome de Guerra</label>
-                                    <input type="text" name="new_user_guerra" class="form-control form-select-sm text-uppercase" placeholder="Ex: SILVA" required>
-                                </div>
+                    <div class="tab-content p-4">
 
-                                <div class="col-12 mt-4">
-                                    <h6 class="text-muted border-bottom pb-2">Dados de Acesso</h6>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Login (Identidade)</label>
-                                    <input type="text" name="new_user_idt" class="form-control form-select-sm" placeholder="000.000.000-0" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Companhia / SU</label>
-                                    <select name="new_user_subunidade" class="form-select form-select-sm" required>
-                                        <option value="EM">Estado Maior</option>
-                                        <option value="CCAP">CCAP</option>
-                                        <option value="1CIA">1ª Cia Eng Cnst</option>
-                                        <option value="2CIA">2ª Cia Eng Cnst</option>
-                                        <option value="CIA_EQP">Cia Eqp E Mnt</option>
-                                        <option value="PMGU">PMGU</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Senha Inicial</label>
-                                    <input type="password" name="new_user_pass" class="form-control form-select-sm" placeholder="******" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small fw-bold">Nível de Permissão</label>
-                                    <select name="new_user_role" class="form-select form-select-sm" required>
-                                        <option value="user">Operador (Apenas Consulta)</option>
-                                        <option value="S2">S2 (Homologa)</option>
-                                        <option value="sargenteacao">Sargenteação (Edita/Exclui)</option>
-                                        <option value="admin">Administrador (Total)</option>
-                                    </select>
-                                </div>
+                        <div class="tab-pane fade show active" id="tab-novo">
+                            <form id="formCreateUser" class="needs-validation" onsubmit="criarUsuario(event)">
+                                <input type="hidden" name="edit_id" id="edit_id">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <h6 class="text-muted border-bottom pb-2">Identificação Militar</h6>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small fw-bold">Posto/Grad</label>
+                                        <select name="new_user_posto" class="form-select form-select-sm" required>
+                                            <option value="">Selecione...</option>
+                                            <option value="Cel">Coronel</option>
+                                            <option value="Ten Cel">Ten Cel</option>
+                                            <option value="Maj">Major</option>
+                                            <option value="Cap">Capitão</option>
+                                            <option value="1º Ten">1º Ten</option>
+                                            <option value="2º Ten">2º Ten</option>
+                                            <option value="Asp">Aspirante</option>
+                                            <option value="Sub Ten">Sub Ten</option>
+                                            <option value="1º Sgt">1º Sgt</option>
+                                            <option value="2º Sgt">2º Sgt</option>
+                                            <option value="3º Sgt">3º Sgt</option>
+                                            <option value="Cb">Cabo</option>
+                                            <option value="Sd">Soldado</option>
+                                            <option value="SC">Servidor Civil</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-8">
+                                        <label class="form-label small fw-bold">Nome de Guerra</label>
+                                        <input type="text" name="new_user_guerra"
+                                            class="form-control form-select-sm text-uppercase" placeholder="Ex: SILVA"
+                                            required>
+                                    </div>
 
-                                <div class="d-grid gap-2 mt-4 d-md-flex justify-content-md-end">
-                                    <button type="button" class="btn btn-secondary me-md-2" onclick="resetarFormularioUsuario()">
-                                        <i class="fas fa-eraser"></i> Limpar
+                                    <div class="col-12 mt-4">
+                                        <h6 class="text-muted border-bottom pb-2">Dados de Acesso</h6>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Login (Identidade)</label>
+                                        <input type="text" name="new_user_idt" class="form-control form-select-sm"
+                                            placeholder="000.000.000-0" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Companhia / SU</label>
+                                        <select name="new_user_subunidade" class="form-select form-select-sm" required>
+                                            <option value="EM">Estado Maior</option>
+                                            <option value="CCAP">CCAP</option>
+                                            <option value="1CIA">1ª Cia Eng Cnst</option>
+                                            <option value="2CIA">2ª Cia Eng Cnst</option>
+                                            <option value="CIA_EQP">Cia Eqp E Mnt</option>
+                                            <option value="PMGU">PMGU</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Senha Inicial</label>
+                                        <input type="password" name="new_user_pass" class="form-control form-select-sm"
+                                            placeholder="******" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-bold">Nível de Permissão</label>
+                                        <select name="new_user_role" class="form-select form-select-sm" required>
+                                            <option value="user">Operador (Apenas Consulta)</option>
+                                            <option value="S2">S2 (Homologa)</option>
+                                            <option value="sargenteacao">Sargenteação (Edita/Exclui)</option>
+                                            <option value="admin">Administrador (Total)</option>
+                                        </select>
+                                    </div>
+
+                                    <div class="d-grid gap-2 mt-4 d-md-flex justify-content-md-end">
+                                        <button type="button" class="btn btn-secondary me-md-2"
+                                            onclick="resetarFormularioUsuario()">
+                                            <i class="fas fa-eraser"></i> Limpar
+                                        </button>
+                                        <button type="submit" class="btn btn-success fw-bold"
+                                            style="background-color: var(--army-green);">
+                                            <i class="fas fa-save me-2"></i> Salvar Dados
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="tab-pane fade" id="tab-lista">
+                            <div id="btnAdminUsers" class="card shadow-sm border-0">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0 text-muted fw-bold">Usuários Cadastrados</h6>
+                                    <button class="btn btn-sm btn-outline-secondary" type="button"
+                                        onclick="carregarListaUsuarios()">
+                                        <i class="fas fa-sync-alt"></i>
                                     </button>
-                                    <button type="submit" class="btn btn-success fw-bold" style="background-color: var(--army-green);">
-                                        <i class="fas fa-save me-2"></i> Salvar Dados
-                                    </button>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-hover table-striped align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th class="ps-3">Identificação</th>
+                                                    <th>Perfil</th>
+                                                    <th class="text-end pe-3">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="listaUsuariosBody">
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
-                        </form>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/script.js"></script>
+
+    <script>
+
+        // ... Mantenha a função togglePublico igual ...
+        function togglePublico(show) {
+            const login = document.getElementById('loginScreen');
+            const pub = document.getElementById('screenPublic');
+            if (show) {
+                login.classList.add('hidden');
+                pub.classList.remove('hidden');
+                document.getElementById('iptPublic').focus();
+            } else {
+                pub.classList.add('hidden');
+                login.classList.remove('hidden');
+            }
+        }
+
+        // Função auxiliar para data (AAAA-MM-DD -> DD/MM/AAAA)
+        function formatarDataBR(dataUSA) {
+            if (!dataUSA) return '---';
+            const partes = dataUSA.split('-');
+            if (partes.length !== 3) return dataUSA;
+            return `${partes[2]}/${partes[1]}/${partes[0]}`;
+        }
+
+        async function busPublica(e) {
+            e.preventDefault();
+            const termo = document.getElementById('iptPublic').value;
+            const area = document.getElementById('resPublic');
+
+            area.innerHTML = '<div class="col-12 text-center p-4"><i class="fas fa-spinner fa-spin fa-2x"></i></div>';
+
+            try {
+                // URL com caminho relativo (Backend na mesma pasta do projeto)
+                const req = await fetch('backend/public_search.php?termo=' + encodeURIComponent(termo));
+                const json = await req.json();
+
+                area.innerHTML = '';
+
+                if (json.status === 'erro') {
+                    area.innerHTML = `<div class="alert alert-danger">Erro SQL: ${json.msg}</div>`;
+                    return;
+                }
+
+                if (json.dados && json.dados.length > 0) {
+                    json.dados.forEach(d => {
+                        // 1. Tratamento do Veículo
+                        let veiculoInfo = '<div class="text-muted small p-2 bg-light rounded text-center">SEM VEÍCULO</div>';
+                        if (d.placa) {
+                            const corStatus = (d.homologado == 1) ? 'success' : 'warning text-dark';
+                            const textoStatus = (d.homologado == 1) ? 'LIBERADO' : 'PENDENTE';
+                            veiculoInfo = `
+                        <div class="border rounded p-2 bg-white text-center">
+                            <div class="fw-bold text-dark small">${d.modelo}</div>
+                            <span class="badge bg-light text-dark border border-dark mb-1 text-uppercase">${d.placa}</span>
+                            <div class="d-grid"><span class="badge bg-${corStatus} small">${textoStatus}</span></div>
+                        </div>`;
+                        }
+
+                        // 2. Tratamento de Dados Pessoais (Com nomes corretos do banco)
+                        const foto = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
+
+                        // Prioriza Seção, se não tiver, tenta Pelotão
+                        const localTrabalho = d.secao ? d.secao : (d.pelotao ? d.pelotao : '---');
+
+                        const nasc = formatarDataBR(d.dt_nascimento); // Nome correto do banco
+                        const praca = formatarDataBR(d.dt_praca);     // Nome correto do banco
+                        const tel = d.celular_princ || 'Não inf.';    // Nome correto do banco
+
+                        // 3. Montagem do Cartão
+                        area.innerHTML += `
+                    <div class="col-lg-6 mb-3">
+                        <div class="card shadow-sm h-100 border-0">
+                            <div class="card-body">
+                                <div class="d-flex">
+                                    <img src="${foto}" class="rounded shadow-sm me-3" style="width:90px; height:110px; object-fit:cover;">
+                                    <div class="w-100">
+                                        <h5 class="fw-bold text-primary mb-0 text-uppercase">${d.posto_grad} ${d.nome_guerra}</h5>
+                                        <div class="small text-muted mb-2 text-uppercase">${d.nome_completo || ''}</div>
+                                        
+                                        <div class="mb-2">
+                                            <span class="badge bg-secondary">${d.subunidade || 'OM'}</span>
+                                            <span class="badge bg-dark">${localTrabalho}</span>
+                                        </div>
+
+                                        <ul class="list-unstyled small mb-0 text-muted" style="font-size: 0.85rem;">
+                                            <li><i class="fas fa-phone-alt me-1 text-success"></i> ${tel}</li>
+                                            <li><i class="fas fa-calendar-alt me-1"></i> Nasc: ${nasc}</li>
+                                            <li><i class="fas fa-medal me-1"></i> Praça: ${praca}</li>
+                                        </ul>
+                                    </div>
+                                    <div class="ms-2" style="min-width: 110px;">
+                                        ${veiculoInfo}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                    });
+                } else {
+                    area.innerHTML = '<div class="col-12 text-center text-muted mt-3"><h5>Nenhum registro encontrado.</h5></div>';
+                }
+            } catch (err) {
+                console.error(err);
+                area.innerHTML = '<div class="alert alert-danger text-center">Erro de conexão.</div>';
+            }
+        }
+    </script>
+    <!-- Modal Ficha Individual Completa-->
+    <div class="modal fade" id="modalFichaLeitura" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="fas fa-file-alt me-2"></i> Ficha de Cadastro Completa</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start">
+                                <img id="f_foto" src="assets/sem_foto.png" class="rounded border shadow-sm me-4"
+                                    style="width: 110px; height: 140px; object-fit: cover;">
+                                <div class="w-100">
+                                    <h3 class="fw-bold text-primary mb-0"><span id="f_posto"></span> <span
+                                            id="f_guerra"></span></h3>
+                                    <div class="text-uppercase fw-bold text-muted mb-2" id="f_nome_completo"></div>
+
+                                    <div class="row g-2">
+                                        <div class="col-md-4">
+                                            <small class="text-muted d-block">Subunidade</small>
+                                            <span class="badge bg-secondary fs-6" id="f_su"></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted d-block">Pelotão / Seção</small>
+                                            <span class="badge bg-dark" id="f_secao"></span>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <small class="text-muted d-block">QMG</small>
+                                            <strong id="f_qmg"></strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="tab-pane fade" id="tab-lista">
-                        <div id="btnAdminUsers" class="card shadow-sm border-0">
-                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                                <h6 class="mb-0 text-muted fw-bold">Usuários Cadastrados</h6>
-                                <button class="btn btn-sm btn-outline-secondary" type="button" onclick="carregarListaUsuarios()">
-                                    <i class="fas fa-sync-alt"></i>
-                                </button>
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white fw-bold text-primary border-bottom">
+                            <i class="fas fa-user-shield me-1"></i> Identificação e Dados Pessoais
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4"><small class="text-muted">CPF</small>
+                                    <div class="fw-bold" id="f_cpf"></div>
+                                </div>
+                                <div class="col-md-4"><small class="text-muted">Identidade Militar</small>
+                                    <div class="fw-bold" id="f_idt"></div>
+                                </div>
+                                <div class="col-md-4"><small class="text-muted">Número</small>
+                                    <div class="fw-bold" id="f_numero"></div>
+                                </div>
+
+                                <div class="col-md-4"><small class="text-muted">Data de Nascimento</small>
+                                    <div class="fw-bold" id="f_nasc"></div>
+                                </div>
+                                <div class="col-md-4"><small class="text-muted">Tipo Sanguíneo</small>
+                                    <div class="fw-bold text-danger" id="f_sangue"></div>
+                                </div>
+                                <div class="col-md-4"><small class="text-muted">Data de Praça</small>
+                                    <div class="fw-bold" id="f_praca"></div>
+                                </div>
                             </div>
-                            <div class="card-body p-0">
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-striped align-middle mb-0">
-                                        <thead class="table-light">
-                                            <tr>
-                                                <th class="ps-3">Identificação</th>
-                                                <th>Perfil</th>
-                                                <th class="text-end pe-3">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="listaUsuariosBody">
-                                            </tbody>
-                                    </table>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm mb-3">
+                        <div class="card-header bg-white fw-bold text-primary border-bottom">
+                            <i class="fas fa-map-marker-alt me-1"></i> Contato e Endereço
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6"><small class="text-muted">Celular Principal</small>
+                                    <div class="fw-bold text-success" id="f_cel1"></div>
+                                </div>
+                                <div class="col-md-6"><small class="text-muted">Celular Secundário</small>
+                                    <div class="fw-bold" id="f_cel2"></div>
+                                </div>
+                                <div class="col-md-12"><small class="text-muted">Email</small>
+                                    <div class="fw-bold" id="f_email"></div>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-1 text-muted">
+                                </div>
+
+                                <div class="col-md-9"><small class="text-muted">Endereço</small>
+                                    <div class="fw-bold" id="f_end"></div>
+                                </div>
+                                <div class="col-md-3"><small class="text-muted">Número</small>
+                                    <div class="fw-bold" id="f_end_num"></div>
+                                </div>
+
+                                <div class="col-md-5"><small class="text-muted">Bairro</small>
+                                    <div class="fw-bold" id="f_bairro"></div>
+                                </div>
+                                <div class="col-md-5"><small class="text-muted">Cidade/UF</small>
+                                    <div class="fw-bold" id="f_cidade"></div>
+                                </div>
+                                <div class="col-md-2"><small class="text-muted">CEP</small>
+                                    <div class="fw-bold" id="f_cep"></div>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-1 text-muted">
+                                </div>
+
+                                <div class="col-md-6"><small class="text-muted">Pessoa de Referência</small>
+                                    <div class="fw-bold" id="f_resp_nome"></div>
+                                </div>
+                                <div class="col-md-6"><small class="text-muted">Tel. Referência</small>
+                                    <div class="fw-bold" id="f_resp_tel"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-header bg-white fw-bold text-primary border-bottom">
+                            <i class="fas fa-car me-1"></i> Veículo e CNH (Seção de Inteligência)
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-3"><small class="text-muted">CNH Categoria</small>
+                                    <div class="fw-bold" id="f_cnh_cat"></div>
+                                </div>
+                                <div class="col-md-3"><small class="text-muted">Validade CNH</small>
+                                    <div class="fw-bold" id="f_cnh_val"></div>
+                                </div>
+                                <div class="col-md-3"><small class="text-muted">Validade CRLV</small>
+                                    <div class="fw-bold" id="f_crlv"></div>
+                                </div>
+                                <div class="col-md-3"><small class="text-muted">Status</small>
+                                    <div id="f_status"></div>
+                                </div>
+
+                                <div class="col-12">
+                                    <hr class="my-1 text-muted">
+                                </div>
+
+                                <div class="col-md-4">
+                                    <small class="text-muted">Placa</small>
+                                    <div class="bg-light border border-dark rounded text-center fw-bold font-monospace py-1"
+                                        id="f_placa"></div>
+                                </div>
+                                <div class="col-md-5"><small class="text-muted">Modelo</small>
+                                    <div class="fw-bold pt-1" id="f_modelo"></div>
+                                </div>
+                                <div class="col-md-3"><small class="text-muted">Cor</small>
+                                    <div class="fw-bold pt-1" id="f_cor"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                 </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary w-100" data-bs-dismiss="modal">Fechar
+                        Visualização</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/script.js"></script>
 </body>
 
 </html>
