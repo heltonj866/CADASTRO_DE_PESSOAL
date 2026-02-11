@@ -128,17 +128,14 @@ async function salvarMilitar() {
 
 // --- CORE: CARREGAR DADOS NA FICHA ---
 async function carregarMilitarNoForm(id, modo) {
-    // 1. Reset visual
     limparFormulario();
-
     try {
         const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
         const json = await res.json();
         if (json.status !== 'sucesso') throw new Error(json.msg);
-
         const d = json.dados;
 
-        // 2. Preenchimento de Campos
+        // Preenche campos
         setVal('militarId', d.id);
         setVal('cpf', d.identidade); setVal('posto_grad', d.posto_grad); setVal('numero', d.numero);
         setVal('nome_guerra', d.nome_guerra); setVal('nome_completo', d.nome_completo);
@@ -153,93 +150,63 @@ async function carregarMilitarNoForm(id, modo) {
         setVal('tipo_veic', d.tipo_veiculo); setVal('placa', d.placa); setVal('modelo', d.modelo);
         setVal('cor', d.cor); setVal('validade_crlv', d.validade_crlv);
 
-        // Checkbox Visual (apenas visual)
         const chkHomolog = document.getElementById('homologado');
         if (chkHomolog) chkHomolog.checked = (d.homologado == 1);
         atualizarBadgeVisual(d.homologado == 1);
-
         if (d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
 
-        // 3. Exibir o Formulário
         document.getElementById('fullRegistrationCard').classList.remove('hidden');
         document.getElementById('fullRegistrationCard').scrollIntoView({ behavior: 'smooth' });
 
-        // 4. LÓGICA DE BOTÕES E PERFIL
+        // --- LÓGICA DE PERFIL E ABA S1 ---
         const badge = document.getElementById('formModeBadge');
         const footerBtns = document.getElementById('formFooterButtons');
-        const role = currentUserRole ? currentUserRole.toLowerCase() : '';
-        const ehS2 = (role === 's2' || role === 'transporte');
 
-        // Layout Padrão de Botões (Admin/Sargenteação)
-        let htmlButtonsPadrao = `
-            <button type="button" id="btnExcluir" class="btn btn-outline-danger ${currentUserRole === 'admin' ? '' : 'd-none'}" onclick="excluirMilitar()">
-                <i class="fas fa-trash-alt me-1"></i> Excluir
-            </button>
-            <div>
-                <button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Cancelar</button>
-                <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar Dados</button>
-            </div>
-        `;
+        // Pega a role (permissão)
+        let role = (window.currentUserRole || localStorage.getItem('sismil_role') || '').toLowerCase().trim();
+        const tabS1 = document.getElementById('tab-s1');
 
-        if (ehS2) {
-            // --- MODO S2: INSPEÇÃO E HOMOLOGAÇÃO ---
-            badge.innerText = "Inspeção Veicular (S2)";
-            badge.className = "badge bg-warning text-dark";
+        if (['admin', 'sargenteacao'].includes(role)) {
+            // MOSTRA A ABA S1
+            if (tabS1) tabS1.classList.remove('d-none');
+            // Carrega o histórico
+            if (typeof carregarHistoricoS1 === 'function') carregarHistoricoS1(d.id);
 
-            // Foca na aba de veículos automaticamente
-            try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if (tab) new bootstrap.Tab(tab).show(); } catch (e) { }
-
-            // Monta os botões Especiais do S2
-            let buttonsS2 = `<div class="w-100 d-flex justify-content-between align-items-center">`;
-            buttonsS2 += `<button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button>`;
-            buttonsS2 += `<div>`;
-
-            if (d.placa && d.placa.trim() !== "") {
-                if (d.homologado == 1) {
-                    // JÁ HOMOLOGADO
-                    buttonsS2 += `
-                    <button type="button" class="btn btn-success me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})">
-                        <i class="fas fa-check-double me-1"></i> Homologado
-                    </button>
-                    <button type="button" class="btn btn-dark fw-bold" onclick="imprimirSelo(${d.id})">
-                        <i class="fas fa-print me-1"></i> Imprimir Selo
-                    </button>`;
-                } else {
-                    // PENDENTE
-                    buttonsS2 += `
-                    <button type="button" class="btn btn-warning me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})">
-                        <i class="fas fa-stamp me-1"></i> HOMOLOGAR VEÍCULO
-                    </button>
-                    <button type="button" class="btn btn-secondary" disabled title="Aprovação necessária">
-                        <i class="fas fa-lock me-1"></i> Selo Bloqueado
-                    </button>`;
-                }
-            } else {
-                buttonsS2 += `<span class="badge bg-light text-secondary border p-2">Veículo não cadastrado</span>`;
-            }
-            buttonsS2 += `</div></div>`;
-
-            // Aplica os botões S2
-            footerBtns.innerHTML = buttonsS2;
-
-            // Bloqueia edição de campos para o S2 (apenas leitura)
-            const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
-            inputs.forEach(el => el.setAttribute('readonly', true));
-            // Para selects, o readonly não funciona bem em alguns browsers, então desabilitamos o pointer events ou usamos disabled
-            document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'none');
-
-        } else {
-            // --- MODO ADMIN/SARGENTEAÇÃO ---
             badge.innerText = "Edição de Cadastro";
             badge.className = "badge bg-primary";
-            footerBtns.innerHTML = htmlButtonsPadrao;
+            footerBtns.innerHTML = `
+                <button type="button" id="btnExcluir" class="btn btn-outline-danger ${role === 'admin' ? '' : 'd-none'}" onclick="excluirMilitar()"><i class="fas fa-trash-alt me-1"></i> Excluir</button>
+                <div><button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Cancelar</button><button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar Dados</button></div>`;
 
-            // Destrava campos
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
             inputs.forEach(el => el.removeAttribute('readonly'));
             document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'auto');
+            if (getEl('cpf')) getEl('cpf').setAttribute('readonly', true);
 
-            if (getEl('cpf')) getEl('cpf').setAttribute('readonly', true); // CPF nunca muda
+        } else if (['s2', 'transporte'].includes(role)) {
+            // S2: ESCONDE A ABA S1
+            if (tabS1) tabS1.classList.add('d-none');
+
+            badge.innerText = "Inspeção Veicular (S2)";
+            badge.className = "badge bg-warning text-dark";
+            try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if (tab) new bootstrap.Tab(tab).show(); } catch (e) { }
+
+            let buttonsS2 = `<div class="w-100 d-flex justify-content-between align-items-center"><button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button><div>`;
+            if (d.placa && d.placa.trim() !== "") {
+                if (d.homologado == 1) {
+                    buttonsS2 += `<button type="button" class="btn btn-success me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})"><i class="fas fa-check-double me-1"></i> Homologado</button><button type="button" class="btn btn-dark fw-bold" onclick="imprimirSelo(${d.id})"><i class="fas fa-print me-1"></i> Imprimir Selo</button>`;
+                } else {
+                    buttonsS2 += `<button type="button" class="btn btn-warning me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})"><i class="fas fa-stamp me-1"></i> HOMOLOGAR VEÍCULO</button>`;
+                }
+            } else { buttonsS2 += `<span class="badge bg-light text-secondary border p-2">Veículo não cadastrado</span>`; }
+            buttonsS2 += `</div></div>`;
+            footerBtns.innerHTML = buttonsS2;
+
+            const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
+            inputs.forEach(el => el.setAttribute('readonly', true));
+            document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'none');
+        } else {
+            if (tabS1) tabS1.classList.add('d-none');
         }
 
     } catch (e) {
@@ -663,5 +630,266 @@ async function abrirModalLeitura(id) {
         alert("Erro de conexão ao buscar dados.");
     } finally {
         document.body.style.cursor = 'default';
+    }
+}
+
+// ==========================================
+// FUNÇÕES DA ABA S1 (HISTÓRICO) - VERSÃO FINAL
+// ==========================================
+
+// 1. CARREGAR TABELA COM CORES INTELIGENTES
+async function carregarHistoricoS1(idMilitar) {
+    try {
+        const res = await fetch(`backend/get_historico.php?id=${idMilitar}`);
+        const json = await res.json();
+
+        const tbody = document.getElementById('listaS1Body');
+        tbody.innerHTML = '';
+        let contadorFO = 0;
+
+        // Garante o ID no campo oculto
+        document.getElementById('s1_militar_id').value = idMilitar;
+
+        if (json.status === 'sucesso') {
+            // Salva na memória para edição
+            window.listaHistoricoAtual = json.dados;
+
+            json.dados.forEach(item => {
+                // Lógica da contagem (apenas FO+ não consumidos)
+                if (item.categoria === 'ELOGIO' && item.tipo_detalhe === 'FO+' && item.consumido == 0) {
+                    contadorFO++;
+                }
+
+                // --- NOVO: LÓGICA DE CORES ---
+                let corBadge = getBadgeClass(item.categoria, item.tipo_detalhe);
+
+                const itemSafe = JSON.stringify(item).replace(/'/g, "&#39;");
+
+                const row = `
+                    <tr>
+                        <td style="white-space:nowrap;">${new Date(item.data_fato).toLocaleDateString('pt-BR')}</td>
+                        <td>
+                            <span class="badge ${corBadge}">${item.tipo_detalhe}</span>
+                        </td>
+                        <td class="text-truncate" style="max-width: 250px;" title="${item.descricao}">${item.descricao}</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1" onclick='prepararEdicaoS1(${item.id})'>
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="excluirHistoricoS1(${item.id}, ${idMilitar})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                tbody.innerHTML += row;
+            });
+
+            // Atualiza barra de progresso
+            atualizarBarraRecompensa(contadorFO);
+        }
+    } catch (e) { console.error(e); }
+}
+
+// --- FUNÇÃO AUXILIAR DE CORES ---
+function getBadgeClass(cat, tipo) {
+    // Normaliza para maiúsculo para evitar erro
+    const c = cat ? cat.toUpperCase() : '';
+    const t = tipo ? tipo.toUpperCase() : '';
+
+    if (c === 'DISCIPLINA') return 'bg-danger'; // Vermelho para Punições
+    if (t === 'FO+' || c === 'ELOGIO') return 'bg-success'; // Verde para Elogios
+    if (t === 'FO-') return 'bg-warning text-dark'; // Amarelo para FO-
+    if (c === 'SAUDE') return 'bg-info text-dark'; // Azul claro para Saúde
+    if (c === 'ACIDENTE') return 'bg-secondary'; // Cinza para Acidente
+
+    return 'bg-secondary'; // Padrão
+}
+
+// --- FUNÇÃO VISUAL DA BARRA ---
+function atualizarBarraRecompensa(contador) {
+    const elTexto = document.getElementById('s1_contador_fo');
+    const elBarra = document.getElementById('s1_bar_fo');
+    const btn = document.getElementById('btnConcederRecompensa');
+
+    if (elTexto) elTexto.innerText = `${contador} / 5`;
+
+    // Limita a barra em 100% visualmente
+    let pct = (contador / 5) * 100;
+    if (pct > 100) pct = 100;
+
+    if (elBarra) {
+        elBarra.style.width = `${pct}%`;
+        // Muda cor da barra se completou
+        elBarra.className = contador >= 5 ? 'progress-bar bg-warning progress-bar-striped progress-bar-animated' : 'progress-bar bg-success';
+    }
+
+    // Mostra/Esconde o botão CONCEDER
+    if (btn) {
+        if (contador >= 5) {
+            btn.classList.remove('d-none');
+            // Efeito pulsante para chamar atenção
+            btn.style.animation = "pulse 1.5s infinite";
+        } else {
+            btn.classList.add('d-none');
+            btn.style.animation = "none";
+        }
+    }
+}
+
+// 2. SALVAR (NOVO OU EDIÇÃO)
+async function salvarHistoricoS1() {
+    const idMilitar = document.getElementById('s1_militar_id').value;
+    const editId = document.getElementById('s1_edit_id').value; // Pega o ID oculto
+
+    // Decide qual arquivo chamar
+    const url = editId ? 'backend/editar_alteracao.php' : 'backend/save_alteracao.php';
+
+    // Pega valores
+    const cat = document.getElementById('s1_cat').value;
+    const tipo = document.getElementById('s1_tipo').value;
+    const data = document.getElementById('s1_data').value;
+    const desc = document.getElementById('s1_desc').value;
+
+    if (!cat || !tipo || !data || !desc) {
+        Swal.fire('Atenção', 'Preencha Categoria, Tipo, Data e Descrição.', 'warning');
+        return;
+    }
+
+    // Monta dados
+    const fd = new FormData();
+    if (editId) fd.append('s1_edit_id', editId); // Envia ID se for edição
+    fd.append('s1_militar_id', idMilitar);
+    fd.append('s1_cat', cat);
+    fd.append('s1_tipo', tipo);
+    fd.append('s1_data', data);
+    fd.append('s1_desc', desc);
+    fd.append('s1_doc', document.getElementById('s1_doc').value);
+    fd.append('s1_dias', document.getElementById('s1_dias').value);
+
+    const file = document.getElementById('s1_file').files[0];
+    if (file) fd.append('s1_file', file);
+
+    try {
+        const res = await fetch(url, { method: 'POST', body: fd });
+        const json = await res.json();
+
+        if (json.status === 'sucesso') {
+            limparFormS1(); // Limpa form
+            carregarHistoricoS1(idMilitar); // Recarrega tabela
+
+            Swal.fire({
+                toast: true, icon: 'success',
+                title: editId ? 'Atualizado!' : 'Salvo!',
+                position: 'top-end', showConfirmButton: false, timer: 1500
+            });
+        } else {
+            Swal.fire('Erro', json.msg || 'Erro desconhecido', 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+// 3. PREPARAR EDIÇÃO (Joga dados para o form)
+function prepararEdicaoS1(item) {
+    // Preenche campos
+    document.getElementById('s1_edit_id').value = item.id; // GUARDA O ID
+    document.getElementById('s1_cat').value = item.categoria;
+    document.getElementById('s1_tipo').value = item.tipo_detalhe;
+    document.getElementById('s1_data').value = item.data_fato;
+    document.getElementById('s1_desc').value = item.descricao;
+    document.getElementById('s1_doc').value = item.documento_ref || '';
+    document.getElementById('s1_dias').value = item.qtd_dias || '';
+
+    // Muda aparência do botão
+    const btn = document.getElementById('btnSalvarS1');
+    btn.innerHTML = 'Salvar Alteração';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-warning');
+
+    // Mostra botão cancelar
+    document.getElementById('btnCancelarS1').classList.remove('d-none');
+}
+
+// 4. LIMPAR (Volta ao normal)
+function limparFormS1() {
+    // Limpa campos visuais
+    document.getElementById('s1_edit_id').value = ''; // Limpa ID de edição
+    document.getElementById('s1_cat').value = '';
+    document.getElementById('s1_tipo').value = '';
+    document.getElementById('s1_data').value = '';
+    document.getElementById('s1_desc').value = '';
+    document.getElementById('s1_doc').value = '';
+    document.getElementById('s1_dias').value = '';
+    document.getElementById('s1_file').value = '';
+
+    // Reseta botões
+    const btn = document.getElementById('btnSalvarS1');
+    btn.innerHTML = 'Adicionar';
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-warning');
+
+    document.getElementById('btnCancelarS1').classList.add('d-none');
+}
+
+// 5. EXCLUIR
+async function excluirHistoricoS1(idItem, idMilitar) {
+    if (!confirm("Excluir registro?")) return;
+
+    try {
+        const res = await fetch('backend/excluir_alteracao.php', {
+            method: 'POST',
+            body: JSON.stringify({ id: idItem })
+        });
+        const json = await res.json();
+
+        if (json.status === 'sucesso') {
+            carregarHistoricoS1(idMilitar);
+            Swal.fire({ toast: true, icon: 'success', title: 'Excluído!', position: 'top-end', showConfirmButton: false, timer: 1500 });
+        } else {
+            Swal.fire('Erro', json.msg, 'error');
+        }
+    } catch (e) { console.error(e); }
+}
+
+// 6. CONCEDER RECOMPENSA (Troca 5 FO+ por 1 Dispensa)
+async function concederRecompensa() {
+    const idMilitar = document.getElementById('s1_militar_id').value;
+
+    const result = await Swal.fire({
+        title: 'Conceder Recompensa?',
+        text: "O sistema irá consumir 5 Elogios (FO+) e gerar 1 Dispensa Recompensa automaticamente.",
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#ffc107',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Sim, conceder!',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+        const res = await fetch('backend/conceder_recompensa.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ militar_id: idMilitar })
+        });
+
+        const json = await res.json();
+
+        if (json.status === 'sucesso') {
+            await Swal.fire({
+                title: 'Recompensa Gerada!',
+                text: 'Os elogios foram baixados e a dispensa foi lançada no histórico.',
+                icon: 'success'
+            });
+            // Recarrega a tabela para mostrar a nova dispensa e a barra zerada
+            carregarHistoricoS1(idMilitar);
+        } else {
+            Swal.fire('Erro', json.msg || 'Não foi possível processar.', 'error');
+        }
+    } catch (e) {
+        console.error(e);
+        Swal.fire('Erro', 'Falha de comunicação com o servidor.', 'error');
     }
 }
