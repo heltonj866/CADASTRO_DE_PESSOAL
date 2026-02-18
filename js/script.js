@@ -95,6 +95,9 @@ async function salvarMilitar() {
     const chk = document.getElementById('homologado');
     if (chk) fd.append('homologado', chk.checked ? '1' : '0');
 
+    // Verifica se estamos editando (tem ID) ou cadastrando novo (sem ID)
+    const isEdicao = document.getElementById('militarId').value !== "";
+
     const btn = document.querySelector('#militaryForm button[type="submit"]');
     if (btn) { btn.innerText = 'Salvando...'; btn.disabled = true; }
 
@@ -103,17 +106,46 @@ async function salvarMilitar() {
         const json = await res.json();
 
         if (json.status === 'sucesso') {
-            Swal.fire({
-                title: 'Sucesso!',
-                text: 'Dados salvos corretamente.',
-                icon: 'success',
-                timer: 1500, // Fecha sozinho em 1.5s
-                showConfirmButton: false
+            
+            // Notificação rápida no topo
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true
             });
+            Toast.fire({ icon: 'success', title: 'Salvo com sucesso!' });
 
-            limparFormulario();     // Limpa/Fecha o form
-            atualizarDashboard();   // Atualiza os números lá em cima
-            atualizarListagem();    // <--- O PULO DO GATO: Atualiza a tabela
+            // Atualiza os números e a tabela no fundo
+            if(typeof atualizarDashboard === 'function') atualizarDashboard();   
+            if(typeof atualizarListagem === 'function') atualizarListagem();
+
+            if (isEdicao) {
+                // SE FOR EDIÇÃO: Não faz nada, mantém os dados na tela para continuar editando se quiser
+            } else {
+                // SE FOR NOVO CADASTRO:
+                // 1. Limpa os campos do formulário manualmente
+                document.getElementById('militaryForm').reset();
+                
+                // 2. Garante que o ID e a Foto sejam resetados
+                document.getElementById('militarId').value = ''; 
+                const img = document.getElementById('imgPreview');
+                if(img) img.src = 'assets/sem_foto.png';
+                
+                // 3. Volta para a primeira aba (Dados Básicos)
+                const firstTabEl = document.querySelector('#myTab button[data-bs-target="#basic"]');
+                if(firstTabEl) { 
+                    const tab = new bootstrap.Tab(firstTabEl); 
+                    tab.show(); 
+                }
+
+                // 4. Coloca o foco no primeiro campo (CPF) para agilizar o próximo
+                const cpfInput = document.querySelector('input[name="cpf"]');
+                if(cpfInput) cpfInput.focus();
+
+                // OBS: NÃO chamamos limparFormulario(), então a tela NÃO fecha!
+            }
 
         } else {
             Swal.fire('Erro', json.msg, 'error');
@@ -892,4 +924,50 @@ async function concederRecompensa() {
         console.error(e);
         Swal.fire('Erro', 'Falha de comunicação com o servidor.', 'error');
     }
+}
+
+// =======================================================
+// FUNÇÃO NOVA: ABRIR FORMULÁRIO PARA NOVO CADASTRO
+// =======================================================
+function abrirNovoCadastro() {
+    // 1. Usa a função nativa para zerar tudo primeiro
+    limparFormulario(); 
+
+    // 2. FORÇA a exibição do Card (Remove o 'hidden' que o limparFormulario colocou)
+    const card = document.getElementById('fullRegistrationCard');
+    if (card) {
+        card.classList.remove('hidden');
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    // 3. Reseta o Badge para visual de "Novo"
+    const badge = document.getElementById('formModeBadge');
+    if (badge) {
+        badge.innerText = "Novo Cadastro";
+        badge.className = "badge bg-secondary";
+    }
+
+    // 4. Garante que os campos estão habilitados (Destrava inputs caso viesse de modo Leitura/S2)
+    const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
+    inputs.forEach(el => {
+        el.removeAttribute('readonly');
+        el.disabled = false;
+    });
+    
+    // Destrava especificamente os selects
+    document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'auto');
+
+    // 5. Garante que o ID está vazio (Para o sistema saber que é INSERT e não UPDATE)
+    const idInput = document.getElementById('militarId');
+    if(idInput) idInput.value = '';
+
+    // 6. Reseta a foto visualmente
+    const img = document.getElementById('imgPreview');
+    if(img) img.src = 'assets/sem_foto.png';
+
+    // 7. Coloca o foco no primeiro campo (CPF) para agilizar
+    setTimeout(() => {
+        const cpfInput = document.querySelector('input[name="cpf"]');
+        if (cpfInput) cpfInput.focus();
+    }, 500);
 }
