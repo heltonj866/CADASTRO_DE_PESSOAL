@@ -9,7 +9,7 @@ $em_desenvolvimento = true;
 if ($em_desenvolvimento) {
     // SEU COMPUTADOR (XAMPP)
     $host = 'localhost';
-    $db   = 'sismil_db'; // <--- CORRIGIDO: Nome correto do seu banco
+    $db   = 'carometro'; // <--- CORRIGIDO: Nome correto do seu banco
     $user = 'root';
     $pass = '';
 } else {
