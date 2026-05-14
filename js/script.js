@@ -1,4 +1,4 @@
-// ARQUIVO: js/script.js (Versão Final Corrigida - Botões no Lugar)
+// ARQUIVO: js/script.js
 
 const postos = ["Cel", "Ten Cel", "Maj", "Cap", "1º Ten", "2º Ten", "Asp", "Subten", "1º Sgt", "2º Sgt", "3º Sgt", "Cb", "Sd EP", "Sd EV", "SC"];
 const qmgs = {
@@ -7,9 +7,6 @@ const qmgs = {
 };
 let currentUserRole = '';
 
-console.log("✅ Sistema Carregado: Versão Final Corrigida");
-
-// --- 1. MÁSCARAS ---
 document.addEventListener('input', function (e) {
     if (!e.target || !e.target.name) return;
     const el = e.target;
@@ -25,7 +22,6 @@ document.addEventListener('input', function (e) {
     if (el.name === 'placa') el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 8);
 });
 
-// --- 2. INICIALIZAÇÃO ---
 document.addEventListener('DOMContentLoaded', () => {
     popularSelects();
     verificarSessao();
@@ -33,15 +29,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const formLogin = document.getElementById('formLogin');
     if (formLogin) formLogin.addEventListener('submit', handleLogin);
 
-    // Listener para Salvar (apenas quando o botão salvar existe e está habilitado)
     const formMilitar = document.getElementById('militaryForm');
     if (formMilitar) {
         formMilitar.addEventListener('submit', function (e) {
             e.preventDefault();
-            // Verifica se o botão de salvar está visível/ativo (para não salvar se for S2 clicando enter)
             const btnSave = document.querySelector('#formFooterButtons button[type="submit"]');
-
-            // Só salva se o botão de salvar existir (Admin/Sargenteação)
             if (btnSave) {
                 if (!this.checkValidity()) {
                     e.stopPropagation();
@@ -57,11 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabNovo) tabNovo.addEventListener('click', resetarFormularioUsuario);
 });
 
-// --- 3. FUNÇÕES PRINCIPAIS ---
 function getEl(k) { return document.getElementById(k) || document.querySelector(`[name="${k}"]`); }
 function setVal(k, v) { const el = getEl(k); if (el) el.value = v || ''; }
 
-// LOGIN
 async function handleLogin(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button');
@@ -76,26 +66,17 @@ async function handleLogin(e) {
         if (json.status === 'sucesso') {
             document.getElementById('loginScreen').classList.add('hidden');
             document.getElementById('appScreen').classList.remove('hidden');
-
-            // --- CORREÇÃO IMPORTANTE: GRAVA A ROLE ---
             window.currentUserRole = json.role;
-            localStorage.setItem('sismil_role', json.role); // <--- OBRIGATÓRIO
+            localStorage.setItem('sismil_role', json.role); 
             window.location.reload();
-            // -----------------------------------------
-
             aplicarPermissoes(json.role);
             atualizarDashboard();
         } else Swal.fire('Erro', json.msg, 'error');
     } catch (err) { console.error(err); } finally { btn.innerText = txt; btn.disabled = false; }
 }
 
-// SALVAR (Admin/Sargenteação)
 async function salvarMilitar() {
     const fd = new FormData(document.getElementById('militaryForm'));
-    const chk = document.getElementById('homologado');
-    if (chk) fd.append('homologado', chk.checked ? '1' : '0');
-
-    // Verifica se estamos editando (tem ID) ou cadastrando novo (sem ID)
     const isEdicao = document.getElementById('militarId').value !== "";
 
     const btn = document.querySelector('#militaryForm button[type="submit"]');
@@ -106,8 +87,6 @@ async function salvarMilitar() {
         const json = await res.json();
 
         if (json.status === 'sucesso') {
-            
-            // Notificação rápida no topo
             const Toast = Swal.mixin({
                 toast: true,
                 position: 'top-end',
@@ -117,36 +96,21 @@ async function salvarMilitar() {
             });
             Toast.fire({ icon: 'success', title: 'Salvo com sucesso!' });
 
-            // Atualiza os números e a tabela no fundo
             if(typeof atualizarDashboard === 'function') atualizarDashboard();   
             if(typeof atualizarListagem === 'function') atualizarListagem();
 
-            if (isEdicao) {
-                // SE FOR EDIÇÃO: Não faz nada, mantém os dados na tela para continuar editando se quiser
-            } else {
-                // SE FOR NOVO CADASTRO:
-                // 1. Limpa os campos do formulário manualmente
+            if (!isEdicao) {
                 document.getElementById('militaryForm').reset();
-                
-                // 2. Garante que o ID e a Foto sejam resetados
                 document.getElementById('militarId').value = ''; 
                 const img = document.getElementById('imgPreview');
                 if(img) img.src = 'assets/sem_foto.png';
                 
-                // 3. Volta para a primeira aba (Dados Básicos)
                 const firstTabEl = document.querySelector('#myTab button[data-bs-target="#basic"]');
-                if(firstTabEl) { 
-                    const tab = new bootstrap.Tab(firstTabEl); 
-                    tab.show(); 
-                }
+                if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
 
-                // 4. Coloca o foco no primeiro campo (CPF) para agilizar o próximo
                 const cpfInput = document.querySelector('input[name="cpf"]');
                 if(cpfInput) cpfInput.focus();
-
-                // OBS: NÃO chamamos limparFormulario(), então a tela NÃO fecha!
             }
-
         } else {
             Swal.fire('Erro', json.msg, 'error');
         }
@@ -158,7 +122,6 @@ async function salvarMilitar() {
     }
 }
 
-// --- CORE: CARREGAR DADOS NA FICHA ---
 async function carregarMilitarNoForm(id, modo) {
     limparFormulario();
     try {
@@ -167,7 +130,6 @@ async function carregarMilitarNoForm(id, modo) {
         if (json.status !== 'sucesso') throw new Error(json.msg);
         const d = json.dados;
 
-        // Preenche campos
         setVal('militarId', d.id);
         setVal('cpf', d.identidade); setVal('posto_grad', d.posto_grad); setVal('numero', d.numero);
         setVal('nome_guerra', d.nome_guerra); setVal('nome_completo', d.nome_completo);
@@ -182,26 +144,40 @@ async function carregarMilitarNoForm(id, modo) {
         setVal('tipo_veic', d.tipo_veiculo); setVal('placa', d.placa); setVal('modelo', d.modelo);
         setVal('cor', d.cor); setVal('validade_crlv', d.validade_crlv);
 
-        const chkHomolog = document.getElementById('homologado');
-        if (chkHomolog) chkHomolog.checked = (d.homologado == 1);
         atualizarBadgeVisual(d.homologado == 1);
         if (d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
+
+        // LÓGICA DE EXIBIÇÃO DOS PDFs NO FORMULÁRIO DE EDIÇÃO/S2
+        const linkCnh = document.getElementById('link_pdf_cnh');
+        if (linkCnh) {
+            if (d.pdf_habilitacao) {
+                linkCnh.innerHTML = `<a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="badge bg-danger text-decoration-none py-1 mt-1"><i class="fas fa-external-link-alt"></i> Visualizar CNH Anexada</a>`;
+                linkCnh.classList.remove('d-none');
+            } else {
+                linkCnh.classList.add('d-none');
+            }
+        }
+        
+        const linkCrlv = document.getElementById('link_pdf_crlv');
+        if (linkCrlv) {
+            if (d.pdf_veiculo) {
+                linkCrlv.innerHTML = `<a href="uploads/documentos/${d.pdf_veiculo}" target="_blank" class="badge bg-danger text-decoration-none py-1 mt-1"><i class="fas fa-external-link-alt"></i> Visualizar CRLV Anexado</a>`;
+                linkCrlv.classList.remove('d-none');
+            } else {
+                linkCrlv.classList.add('d-none');
+            }
+        }
 
         document.getElementById('fullRegistrationCard').classList.remove('hidden');
         document.getElementById('fullRegistrationCard').scrollIntoView({ behavior: 'smooth' });
 
-        // --- LÓGICA DE PERFIL E ABA S1 ---
         const badge = document.getElementById('formModeBadge');
         const footerBtns = document.getElementById('formFooterButtons');
-
-        // Pega a role (permissão)
         let role = (window.currentUserRole || localStorage.getItem('sismil_role') || '').toLowerCase().trim();
         const tabS1 = document.getElementById('tab-s1');
 
         if (['admin', 'sargenteacao'].includes(role)) {
-            // MOSTRA A ABA S1
             if (tabS1) tabS1.classList.remove('d-none');
-            // Carrega o histórico
             if (typeof carregarHistoricoS1 === 'function') carregarHistoricoS1(d.id);
 
             badge.innerText = "Edição de Cadastro";
@@ -216,7 +192,6 @@ async function carregarMilitarNoForm(id, modo) {
             if (getEl('cpf')) getEl('cpf').setAttribute('readonly', true);
 
         } else if (['s2', 'transporte'].includes(role)) {
-            // S2: ESCONDE A ABA S1
             if (tabS1) tabS1.classList.add('d-none');
 
             badge.innerText = "Inspeção Veicular (S2)";
@@ -247,43 +222,21 @@ async function carregarMilitarNoForm(id, modo) {
     }
 }
 
-// --- TOGGLE DENTRO DO FORMULÁRIO (S2) ---
 async function toggleHomologacaoForm(id) {
-    // Removemos o "confirm" padrão chato e usamos algo mais fluido ou direto, 
-    // mas se quiser manter o confirm, tudo bem. Vamos manter pela segurança.
     if (!confirm("Confirma a alteração do status de homologação?")) return;
-
     try {
-        const res = await fetch('backend/toggle_homolog.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: id })
-        });
+        const res = await fetch('backend/toggle_homolog.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
         const json = await res.json();
-
         if (json.status === 'sucesso') {
-            // 1. Atualiza a ficha aberta (botoes mudam de cor na hora)
             carregarMilitarNoForm(id, 'reload');
-
-            // 2. Atualiza os números do Dashboard
             atualizarDashboard();
-
-            // 3. Atualiza a lista de pesquisa lá no fundo
             atualizarListagem();
-
-            // Opcional: Um feedback visual rápido (Toast)
-            const Toast = Swal.mixin({
-                toast: true, position: 'top-end', showConfirmButton: false, timer: 2000
-            });
+            const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
             Toast.fire({ icon: 'success', title: 'Status atualizado!' });
-
-        } else {
-            alert("Erro: " + json.msg);
-        }
+        } else { alert("Erro: " + json.msg); }
     } catch (e) { console.error(e); alert("Erro de conexão"); }
 }
 
-// --- BUSCA (LISTA DE CARDS) ---
 async function realizarBusca(e, tipo) {
     if (e) e.preventDefault();
     const area = document.getElementById('resultsArea');
@@ -306,7 +259,6 @@ async function realizarBusca(e, tipo) {
         const json = await res.json();
         area.innerHTML = '';
 
-        // BLINDAGEM: Pega o perfil e transforma em minúsculo (S2 vira s2, Admin vira admin)
         let roleRaw = window.currentUserRole || localStorage.getItem('sismil_role') || 'user';
         let role = String(roleRaw).toLowerCase().trim();
 
@@ -317,31 +269,14 @@ async function realizarBusca(e, tipo) {
                 const foto = m.foto_path ? `uploads/${m.foto_path}` : 'assets/sem_foto.png';
                 let btnAcao = '';
 
-                // LÓGICA DE BOTÕES (Agora aceita maiúsculas e minúsculas automaticamente)
-
-                // 1. CHEFES (Admin / Sargenteação)
                 if (['admin', 'sargenteacao'].includes(role)) {
-                    btnAcao = `<button class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="carregarMilitarNoForm(${m.id}, 'edit')">
-                                    <i class="fas fa-edit me-1"></i> Editar
-                               </button>`;
+                    btnAcao = `<button class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="carregarMilitarNoForm(${m.id}, 'edit')"><i class="fas fa-edit me-1"></i> Editar</button>`;
+                } else if (['s2', 'transporte'].includes(role)) {
+                    btnAcao = `<button class="btn btn-sm btn-warning w-100 mb-1 fw-bold" onclick="carregarMilitarNoForm(${m.id}, 'homolog')"><i class="fas fa-search me-1"></i> Inspecionar</button>`;
+                } else {
+                    btnAcao = `<button class="btn btn-sm btn-primary w-100 mb-1" onclick="abrirModalLeitura(${m.id})"><i class="fas fa-eye me-1"></i> Ver Ficha</button>`;
                 }
-                // 2. FISCALIZAÇÃO (S2 / Transporte)
-                else if (['S2', 's2', 'transporte'].includes(role)) {
-                    btnAcao = `<button class="btn btn-sm btn-warning w-100 mb-1 fw-bold" onclick="carregarMilitarNoForm(${m.id}, 'homolog')">
-                                    <i class="fas fa-search me-1"></i> Inspecionar
-                               </button>`;
-                }
-                // 3. AUDITORIA / CONSULTA (Todo o resto)
-                else {
-                    btnAcao = `<button class="btn btn-sm btn-primary w-100 mb-1" onclick="abrirModalLeitura(${m.id})">
-                                    <i class="fas fa-eye me-1"></i> Ver Ficha
-                               </button>`;
-                }
-
-                // Botão Resumo (Sempre visível)
-                const btnResumo = `<button class="btn btn-sm btn-outline-info w-100" onclick="verDetalhesMilitar(${m.id})">
-                                        <i class="fas fa-id-card me-1"></i> Resumo
-                                   </button>`;
+                const btnResumo = `<button class="btn btn-sm btn-outline-info w-100" onclick="verDetalhesMilitar(${m.id})"><i class="fas fa-id-card me-1"></i> Resumo</button>`;
 
                 area.innerHTML += `
                 <div class="col-md-3 mb-3">
@@ -352,10 +287,7 @@ async function realizarBusca(e, tipo) {
                         <div class="card-body text-center p-2">
                             <h6 class="fw-bold m-0">${m.posto_grad} ${m.nome_guerra}</h6>
                             <small class="text-muted">${m.subunidade}</small>
-                            <div class="mt-2">
-                                ${btnAcao}
-                                ${btnResumo}
-                            </div>
+                            <div class="mt-2">${btnAcao}${btnResumo}</div>
                         </div>
                     </div>
                 </div>`;
@@ -370,7 +302,6 @@ async function realizarBusca(e, tipo) {
     }
 }
 
-// VISUALIZAR FICHA (Read-Only Modal)
 async function verDetalhesMilitar(id) {
     document.body.style.cursor = 'wait';
     try {
@@ -411,7 +342,6 @@ async function verDetalhesMilitar(id) {
     finally { document.body.style.cursor = 'default'; }
 }
 
-// OUTRAS AUXILIARES
 function popularSelects() {
     const sp = document.getElementById('selectPosto'), sc = document.getElementById('searchPosto');
     postos.forEach(p => { if (sp) sp.add(new Option(p, p)); if (sc) sc.add(new Option(p, p)) });
@@ -419,38 +349,26 @@ function popularSelects() {
     const add = (el) => { for (const [g, l] of Object.entries(qmgs)) { const o = document.createElement('optgroup'); o.label = g; l.forEach(q => o.appendChild(new Option(q, q))); el.appendChild(o) } };
     if (sq) add(sq); if (sqc) add(sqc);
 }
+
 function verificarSessao() { fetch('backend/check_session.php').then(r => r.json()).then(j => { if (j.status === 'logado') { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden'); currentUserRole = j.role; aplicarPermissoes(j.role); atualizarDashboard(); } }) }
 
-// APLICAR PERMISSÕES
-// APLICAR PERMISSÕES (Corrigido: Esconde cadastro para Consulta e S2)
 function aplicarPermissoes(role) {
     const adminBtn = document.getElementById('btnAdminUsers');
     const display = document.getElementById('displayUserRole');
-    const formCard = document.getElementById('fullRegistrationCard'); // O formulário de cadastro
+    const formCard = document.getElementById('fullRegistrationCard'); 
 
     if (display) display.innerText = role.toUpperCase();
-
-    // Normaliza para minúsculo para evitar erros
     const r = role ? role.toLowerCase() : '';
 
-    // 1. ADMIN
     if (r === 'admin') {
         if (adminBtn) adminBtn.classList.remove('hidden');
-        if (formCard) formCard.classList.remove('hidden'); // Admin vê o cadastro sempre
+        if (formCard) formCard.classList.remove('hidden'); 
         carregarListaUsuarios();
-    }
-    // 2. SARGENTEAÇÃO
-    else if (r === 'sargenteacao') {
+    } else if (r === 'sargenteacao') {
         if (adminBtn) adminBtn.classList.add('hidden');
-        if (formCard) formCard.classList.remove('hidden'); // Sargenteação vê o cadastro sempre
-    }
-    // 3. S2 e USUÁRIO COMUM (Consulta)
-    else {
-        // Esconde botão de admin
+        if (formCard) formCard.classList.remove('hidden'); 
+    } else {
         if (adminBtn) adminBtn.classList.add('hidden');
-
-        // IMPORTANTE: Esconde o formulário de cadastro inicial
-        // (O S2 só verá o formulário quando clicar em "Inspecionar" na busca)
         if (formCard) formCard.classList.add('hidden');
     }
 }
@@ -463,7 +381,6 @@ function previewImage(input) { if (input.files && input.files[0]) { var reader =
 function atualizarDashboard() { fetch('backend/dashboard_stats.php').then(r => r.json()).then(j => { if (j.status === 'sucesso') { document.getElementById('dashMilitares').innerText = j.militares; document.getElementById('dashVeiculos').innerText = j.veiculos; document.getElementById('dashPendentes').innerText = j.pendentes; document.getElementById('dashboardPanel').classList.remove('hidden'); } }) }
 async function realizarLogout() { await fetch('backend/logout.php'); location.reload(); }
 
-// Gestão de Usuários (Apenas Admin)
 async function carregarListaUsuarios() {
     const painel = document.getElementById('btnAdminUsers');
     const tbody = document.getElementById('listaUsuariosBody');
@@ -485,26 +402,20 @@ async function criarUsuario(e) { e.preventDefault(); const fd = new FormData(doc
 function resetarFormularioUsuario() { document.getElementById('formCreateUser').reset(); document.getElementById('edit_id').value = ''; document.querySelector('[name="new_user_idt"]').removeAttribute('readonly'); document.querySelector('#formCreateUser button[type="submit"]').innerHTML = '<i class="fas fa-save me-1"></i> Salvar Dados'; }
 function prepararEdicao(id, p, g, s, i, r) { new bootstrap.Tab(document.querySelector('button[data-bs-target="#tab-novo"]')).show(); document.getElementById('edit_id').value = id; const f = document.forms['formCreateUser']; f.new_user_posto.value = p; f.new_user_guerra.value = g; f.new_user_subunidade.value = s; f.new_user_idt.value = i; f.new_user_role.value = r; f.new_user_idt.setAttribute('readonly', true); document.querySelector('#formCreateUser button[type="submit"]').innerHTML = '<i class="fas fa-sync me-1"></i> Atualizar'; }
 function exportarParaExcel() { const tipo = document.querySelector('#searchTabs .active') ? (document.querySelector('#searchTabs .active').id === 'li-tab-cnh' ? 'cnh' : 'geral') : 'geral'; window.open(`backend/export_excel.php?tipo_busca=${tipo}`, '_blank'); }
-// Função Corrigida: Fecha a ficha com segurança
+
 function limparFormulario() {
     const form = document.getElementById('militaryForm');
     if (form) form.reset();
 
-    // Limpa campos específicos com verificação de existência
     if (document.getElementById('militarId')) document.getElementById('militarId').value = '';
     if (document.getElementById('imgPreview')) document.getElementById('imgPreview').src = 'assets/sem_foto.png';
 
-    // --- CORREÇÃO DO ERRO ---
-    // Só tenta esconder o botão Excluir SE ele existir na tela
     const btnExcluir = document.getElementById('btnExcluir');
     if (btnExcluir) btnExcluir.classList.add('d-none');
-    // ------------------------
 
-    // Esconde o card principal
     const card = document.getElementById('fullRegistrationCard');
     if (card) card.classList.add('hidden');
 
-    // Restaura botões padrão (Admin/Sargenteação) para a próxima vez
     const footerBtns = document.getElementById('formFooterButtons');
     if (footerBtns) {
         footerBtns.innerHTML = `
@@ -520,7 +431,6 @@ function limparFormulario() {
         `;
     }
 
-    // Opcional: Rola a tela de volta para o topo ou para a busca
     const resultsArea = document.getElementById('resultsArea');
     if (resultsArea && !resultsArea.classList.contains('hidden')) {
         resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -532,17 +442,11 @@ function imprimirSelo(id) {
     window.open(`backend/print_selo.php?id=${id}`, 'ImprimirSelo', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
 }
 
-// Função auxiliar para atualizar a lista sem recarregar a página
 function atualizarListagem() {
     const areaResultados = document.getElementById('resultsArea');
-
-    // Só atualiza se a lista de resultados estiver visível
     if (areaResultados && !areaResultados.classList.contains('hidden')) {
-        // Verifica qual aba está ativa (Geral ou CNH)
         const tabCnh = document.getElementById('tab-cnh');
         const tipo = (tabCnh && tabCnh.classList.contains('active')) ? 'cnh' : 'geral';
-
-        // Chama a busca novamente silenciosamente (passando null no evento)
         realizarBusca(null, tipo);
     }
 }
@@ -575,7 +479,7 @@ async function excluirMilitar() {
                 Swal.fire('Excluído!', 'O registro foi removido.', 'success');
                 limparFormulario();
                 atualizarDashboard();
-                atualizarListagem(); // <--- Atualiza a lista
+                atualizarListagem(); 
             } else {
                 Swal.fire('Erro', json.msg, 'error');
             }
@@ -585,9 +489,7 @@ async function excluirMilitar() {
     }
 }
 
-// FUNÇÃO NOVA: Preenche o modal de leitura
 async function abrirModalLeitura(id) {
-    // Feedback de carregamento
     document.body.style.cursor = 'wait';
 
     try {
@@ -596,12 +498,9 @@ async function abrirModalLeitura(id) {
 
         if (json.status === 'sucesso') {
             const d = json.dados;
-
-            // Funções auxiliares de formatação
             const txt = (v) => (v && v !== 'null' && String(v).trim() !== '') ? v : '---';
             const data = (dt) => (dt && dt.length === 10) ? dt.split('-').reverse().join('/') : '---';
 
-            // 1. Cabeçalho
             document.getElementById('f_foto').src = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
             document.getElementById('f_posto').innerText = txt(d.posto_grad);
             document.getElementById('f_guerra').innerText = txt(d.nome_guerra);
@@ -610,7 +509,6 @@ async function abrirModalLeitura(id) {
             document.getElementById('f_secao').innerText = txt(d.pelotao) + (d.secao ? ` / ${d.secao}` : '');
             document.getElementById('f_qmg').innerText = txt(d.qmg);
 
-            // 2. Dados Pessoais
             document.getElementById('f_cpf').innerText = txt(d.identidade);
             document.getElementById('f_idt').innerText = txt(d.idt_militar);
             document.getElementById('f_numero').innerText = txt(d.numero);
@@ -618,30 +516,26 @@ async function abrirModalLeitura(id) {
             document.getElementById('f_sangue').innerText = txt(d.tipo_sanguineo);
             document.getElementById('f_praca').innerText = data(d.dt_praca);
 
-            // 3. Contato e Endereço
             document.getElementById('f_cel1').innerText = txt(d.celular_princ);
             document.getElementById('f_cel2').innerText = txt(d.celular_sec);
             document.getElementById('f_email').innerText = txt(d.email);
-
             document.getElementById('f_end').innerText = txt(d.endereco);
             document.getElementById('f_end_num').innerText = txt(d.num_residencia);
             document.getElementById('f_bairro').innerText = txt(d.bairro);
             document.getElementById('f_cidade').innerText = `${txt(d.cidade)} - ${txt(d.estado)}`;
             document.getElementById('f_cep').innerText = txt(d.cep);
-
             document.getElementById('f_resp_nome').innerText = txt(d.nome_resp);
             document.getElementById('f_resp_tel').innerText = txt(d.tel_resp);
 
-            // 4. Trânsito
-            document.getElementById('f_cnh_cat').innerText = txt(d.cat_cnh);
+            // AQUI É A LÓGICA DO PDF PARA A VISUALIZAÇÃO LEITURA DA FICHA
+            document.getElementById('f_cnh_cat').innerHTML = txt(d.cat_cnh) + (d.pdf_habilitacao ? ` <a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
             document.getElementById('f_cnh_val').innerText = data(d.validade_cnh);
-            document.getElementById('f_crlv').innerText = data(d.validade_crlv);
+            document.getElementById('f_crlv').innerHTML = data(d.validade_crlv) + (d.pdf_veiculo ? ` <a href="uploads/documentos/${d.pdf_veiculo}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
 
             document.getElementById('f_placa').innerText = txt(d.placa);
             document.getElementById('f_modelo').innerText = txt(d.modelo);
             document.getElementById('f_cor').innerText = txt(d.cor);
 
-            // Badge de Status
             const badge = document.getElementById('f_status');
             if (d.placa && d.placa.length > 2) {
                 badge.innerHTML = d.homologado == 1
@@ -651,7 +545,6 @@ async function abrirModalLeitura(id) {
                 badge.innerHTML = '<span class="badge bg-light text-muted border">S/ VEÍCULO</span>';
             }
 
-            // Exibir Modal
             new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
 
         } else {
@@ -665,38 +558,23 @@ async function abrirModalLeitura(id) {
     }
 }
 
-// ==========================================
-// FUNÇÕES DA ABA S1 (HISTÓRICO) - VERSÃO FINAL
-// ==========================================
-
-// 1. CARREGAR TABELA COM CORES INTELIGENTES
 async function carregarHistoricoS1(idMilitar) {
     try {
         const res = await fetch(`backend/get_historico.php?id=${idMilitar}`);
         const json = await res.json();
-
         const tbody = document.getElementById('listaS1Body');
         tbody.innerHTML = '';
         let contadorFO = 0;
-
-        // Garante o ID no campo oculto
         document.getElementById('s1_militar_id').value = idMilitar;
 
         if (json.status === 'sucesso') {
-            // Salva na memória para edição
             window.listaHistoricoAtual = json.dados;
-
             json.dados.forEach(item => {
-                // Lógica da contagem (apenas FO+ não consumidos)
                 if (item.categoria === 'ELOGIO' && item.tipo_detalhe === 'FO+' && item.consumido == 0) {
                     contadorFO++;
                 }
-
-                // --- NOVO: LÓGICA DE CORES ---
                 let corBadge = getBadgeClass(item.categoria, item.tipo_detalhe);
-
                 const itemSafe = JSON.stringify(item).replace(/'/g, "&#39;");
-
                 const row = `
                     <tr>
                         <td style="white-space:nowrap;">${new Date(item.data_fato).toLocaleDateString('pt-BR')}</td>
@@ -716,51 +594,39 @@ async function carregarHistoricoS1(idMilitar) {
                 `;
                 tbody.innerHTML += row;
             });
-
-            // Atualiza barra de progresso
             atualizarBarraRecompensa(contadorFO);
         }
     } catch (e) { console.error(e); }
 }
 
-// --- FUNÇÃO AUXILIAR DE CORES ---
 function getBadgeClass(cat, tipo) {
-    // Normaliza para maiúsculo para evitar erro
     const c = cat ? cat.toUpperCase() : '';
     const t = tipo ? tipo.toUpperCase() : '';
-
-    if (c === 'DISCIPLINA') return 'bg-danger'; // Vermelho para Punições
-    if (t === 'FO+' || c === 'ELOGIO') return 'bg-success'; // Verde para Elogios
-    if (t === 'FO-') return 'bg-warning text-dark'; // Amarelo para FO-
-    if (c === 'SAUDE') return 'bg-info text-dark'; // Azul claro para Saúde
-    if (c === 'ACIDENTE') return 'bg-secondary'; // Cinza para Acidente
-
-    return 'bg-secondary'; // Padrão
+    if (c === 'DISCIPLINA') return 'bg-danger'; 
+    if (t === 'FO+' || c === 'ELOGIO') return 'bg-success'; 
+    if (t === 'FO-') return 'bg-warning text-dark'; 
+    if (c === 'SAUDE') return 'bg-info text-dark'; 
+    if (c === 'ACIDENTE') return 'bg-secondary'; 
+    return 'bg-secondary'; 
 }
 
-// --- FUNÇÃO VISUAL DA BARRA ---
 function atualizarBarraRecompensa(contador) {
     const elTexto = document.getElementById('s1_contador_fo');
     const elBarra = document.getElementById('s1_bar_fo');
     const btn = document.getElementById('btnConcederRecompensa');
 
     if (elTexto) elTexto.innerText = `${contador} / 5`;
-
-    // Limita a barra em 100% visualmente
     let pct = (contador / 5) * 100;
     if (pct > 100) pct = 100;
 
     if (elBarra) {
         elBarra.style.width = `${pct}%`;
-        // Muda cor da barra se completou
         elBarra.className = contador >= 5 ? 'progress-bar bg-warning progress-bar-striped progress-bar-animated' : 'progress-bar bg-success';
     }
 
-    // Mostra/Esconde o botão CONCEDER
     if (btn) {
         if (contador >= 5) {
             btn.classList.remove('d-none');
-            // Efeito pulsante para chamar atenção
             btn.style.animation = "pulse 1.5s infinite";
         } else {
             btn.classList.add('d-none');
@@ -769,15 +635,11 @@ function atualizarBarraRecompensa(contador) {
     }
 }
 
-// 2. SALVAR (NOVO OU EDIÇÃO)
 async function salvarHistoricoS1() {
     const idMilitar = document.getElementById('s1_militar_id').value;
-    const editId = document.getElementById('s1_edit_id').value; // Pega o ID oculto
-
-    // Decide qual arquivo chamar
+    const editId = document.getElementById('s1_edit_id').value; 
     const url = editId ? 'backend/editar_alteracao.php' : 'backend/save_alteracao.php';
 
-    // Pega valores
     const cat = document.getElementById('s1_cat').value;
     const tipo = document.getElementById('s1_tipo').value;
     const data = document.getElementById('s1_data').value;
@@ -788,9 +650,8 @@ async function salvarHistoricoS1() {
         return;
     }
 
-    // Monta dados
     const fd = new FormData();
-    if (editId) fd.append('s1_edit_id', editId); // Envia ID se for edição
+    if (editId) fd.append('s1_edit_id', editId); 
     fd.append('s1_militar_id', idMilitar);
     fd.append('s1_cat', cat);
     fd.append('s1_tipo', tipo);
@@ -807,9 +668,8 @@ async function salvarHistoricoS1() {
         const json = await res.json();
 
         if (json.status === 'sucesso') {
-            limparFormS1(); // Limpa form
-            carregarHistoricoS1(idMilitar); // Recarrega tabela
-
+            limparFormS1(); 
+            carregarHistoricoS1(idMilitar); 
             Swal.fire({
                 toast: true, icon: 'success',
                 title: editId ? 'Atualizado!' : 'Salvo!',
@@ -821,10 +681,8 @@ async function salvarHistoricoS1() {
     } catch (e) { console.error(e); }
 }
 
-// 3. PREPARAR EDIÇÃO (Joga dados para o form)
 function prepararEdicaoS1(item) {
-    // Preenche campos
-    document.getElementById('s1_edit_id').value = item.id; // GUARDA O ID
+    document.getElementById('s1_edit_id').value = item.id; 
     document.getElementById('s1_cat').value = item.categoria;
     document.getElementById('s1_tipo').value = item.tipo_detalhe;
     document.getElementById('s1_data').value = item.data_fato;
@@ -832,20 +690,16 @@ function prepararEdicaoS1(item) {
     document.getElementById('s1_doc').value = item.documento_ref || '';
     document.getElementById('s1_dias').value = item.qtd_dias || '';
 
-    // Muda aparência do botão
     const btn = document.getElementById('btnSalvarS1');
     btn.innerHTML = 'Salvar Alteração';
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-warning');
 
-    // Mostra botão cancelar
     document.getElementById('btnCancelarS1').classList.remove('d-none');
 }
 
-// 4. LIMPAR (Volta ao normal)
 function limparFormS1() {
-    // Limpa campos visuais
-    document.getElementById('s1_edit_id').value = ''; // Limpa ID de edição
+    document.getElementById('s1_edit_id').value = ''; 
     document.getElementById('s1_cat').value = '';
     document.getElementById('s1_tipo').value = '';
     document.getElementById('s1_data').value = '';
@@ -854,7 +708,6 @@ function limparFormS1() {
     document.getElementById('s1_dias').value = '';
     document.getElementById('s1_file').value = '';
 
-    // Reseta botões
     const btn = document.getElementById('btnSalvarS1');
     btn.innerHTML = 'Adicionar';
     btn.classList.add('btn-primary');
@@ -863,27 +716,19 @@ function limparFormS1() {
     document.getElementById('btnCancelarS1').classList.add('d-none');
 }
 
-// 5. EXCLUIR
 async function excluirHistoricoS1(idItem, idMilitar) {
     if (!confirm("Excluir registro?")) return;
-
     try {
-        const res = await fetch('backend/excluir_alteracao.php', {
-            method: 'POST',
-            body: JSON.stringify({ id: idItem })
-        });
+        const res = await fetch('backend/excluir_alteracao.php', { method: 'POST', body: JSON.stringify({ id: idItem }) });
         const json = await res.json();
 
         if (json.status === 'sucesso') {
             carregarHistoricoS1(idMilitar);
             Swal.fire({ toast: true, icon: 'success', title: 'Excluído!', position: 'top-end', showConfirmButton: false, timer: 1500 });
-        } else {
-            Swal.fire('Erro', json.msg, 'error');
-        }
+        } else { Swal.fire('Erro', json.msg, 'error'); }
     } catch (e) { console.error(e); }
 }
 
-// 6. CONCEDER RECOMPENSA (Troca 5 FO+ por 1 Dispensa)
 async function concederRecompensa() {
     const idMilitar = document.getElementById('s1_militar_id').value;
 
@@ -910,64 +755,8 @@ async function concederRecompensa() {
         const json = await res.json();
 
         if (json.status === 'sucesso') {
-            await Swal.fire({
-                title: 'Recompensa Gerada!',
-                text: 'Os elogios foram baixados e a dispensa foi lançada no histórico.',
-                icon: 'success'
-            });
-            // Recarrega a tabela para mostrar a nova dispensa e a barra zerada
+            await Swal.fire({ title: 'Recompensa Gerada!', text: 'Os elogios foram baixados e a dispensa foi lançada no histórico.', icon: 'success' });
             carregarHistoricoS1(idMilitar);
-        } else {
-            Swal.fire('Erro', json.msg || 'Não foi possível processar.', 'error');
-        }
-    } catch (e) {
-        console.error(e);
-        Swal.fire('Erro', 'Falha de comunicação com o servidor.', 'error');
-    }
-}
-
-// =======================================================
-// FUNÇÃO NOVA: ABRIR FORMULÁRIO PARA NOVO CADASTRO
-// =======================================================
-function abrirNovoCadastro() {
-    // 1. Usa a função nativa para zerar tudo primeiro
-    limparFormulario(); 
-
-    // 2. FORÇA a exibição do Card (Remove o 'hidden' que o limparFormulario colocou)
-    const card = document.getElementById('fullRegistrationCard');
-    if (card) {
-        card.classList.remove('hidden');
-        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-
-    // 3. Reseta o Badge para visual de "Novo"
-    const badge = document.getElementById('formModeBadge');
-    if (badge) {
-        badge.innerText = "Novo Cadastro";
-        badge.className = "badge bg-secondary";
-    }
-
-    // 4. Garante que os campos estão habilitados (Destrava inputs caso viesse de modo Leitura/S2)
-    const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
-    inputs.forEach(el => {
-        el.removeAttribute('readonly');
-        el.disabled = false;
-    });
-    
-    // Destrava especificamente os selects
-    document.querySelectorAll('#militaryForm select').forEach(s => s.style.pointerEvents = 'auto');
-
-    // 5. Garante que o ID está vazio (Para o sistema saber que é INSERT e não UPDATE)
-    const idInput = document.getElementById('militarId');
-    if(idInput) idInput.value = '';
-
-    // 6. Reseta a foto visualmente
-    const img = document.getElementById('imgPreview');
-    if(img) img.src = 'assets/sem_foto.png';
-
-    // 7. Coloca o foco no primeiro campo (CPF) para agilizar
-    setTimeout(() => {
-        const cpfInput = document.querySelector('input[name="cpf"]');
-        if (cpfInput) cpfInput.focus();
-    }, 500);
+        } else { Swal.fire('Erro', json.msg || 'Não foi possível processar.', 'error'); }
+    } catch (e) { console.error(e); Swal.fire('Erro', 'Falha de comunicação com o servidor.', 'error'); }
 }
