@@ -2,49 +2,43 @@
 // ARQUIVO: backend/print_selo.php
 require 'db_connect.php';
 
-// 1. Verifica ID
-if (!isset($_GET['id']) || empty($_GET['id'])) { die("ID não fornecido."); }
-$id = $_GET['id'];
+// Recebemos o veiculo_id enviado pelo novo script.js
+$veiculo_id = $_GET['veiculo_id'] ?? null; 
+
+if (!$veiculo_id) {
+    die("ID do veículo não fornecido.");
+}
 
 try {
-    // 2. Busca dados
-    $sql = "SELECT * FROM tb_militares WHERE id = ?";
+    // JOIN entre veículos e militares para buscar os dados corretamente na nova estrutura
+    $sql = "SELECT v.*, m.posto_grad, m.nome_guerra, m.numero, m.celular_princ 
+            FROM tb_veiculos v 
+            JOIN tb_militares m ON v.militar_id = m.id 
+            WHERE v.id = ?";
+            
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$id]);
+    $stmt->execute([$veiculo_id]);
     $m = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$m) { die("Militar não encontrado."); }
+    if (!$m) die("Veículo ou militar não encontrado.");
 
+    // Verifica se está homologado
     if ($m['homologado'] != 1) {
-        die("
-            <div style='font-family:sans-serif; text-align:center; padding:50px; color:#b30000'>
-                <h1>🚫 ACESSO NEGADO 🚫</h1>
-                <h3>Veículo aguardando homologação da 2ª Seção.</h3>
-                <p>O selo só pode ser gerado após vistoria e liberação no sistema.</p>
-            </div>
-        ");
+        die("<div style='text-align:center; padding:50px;'><h1>🚫 VEÍCULO NÃO HOMOLOGADO 🚫</h1></div>");
     }
 
-    // 3. Lógica de Cores (Hierarquia)
+    // Lógica de Cores por posto
     $cor_tema = '#000'; 
     $posto = $m['posto_grad'];
-
+    
     $oficiais = ['Gen', 'Cel', 'Ten Cel', 'Maj', 'Cap', '1º Ten', '2º Ten', 'Asp'];
     $graduados = ['Sub Ten', '1º Sgt', '2º Sgt', '3º Sgt'];
-    $pracas = ['Cb', 'Sd', 'Sd EP', 'Sd EV'];
-    $civis = ['SC'];
+    
+    if (in_array($posto, $oficiais)) $cor_tema = '#b30000'; // Vermelho
+    elseif (in_array($posto, $graduados)) $cor_tema = '#0033cc'; // Azul
+    else $cor_tema = '#006600'; // Verde
 
-    if (in_array($posto, $oficiais)) {
-        $cor_tema = '#b30000'; // Vermelho
-    } elseif (in_array($posto, $graduados)) {
-        $cor_tema = '#0033cc'; // Azul
-    } elseif (in_array($posto, $pracas)) {
-        $cor_tema = '#006600'; // Verde
-    } elseif (in_array($posto, $civis)) {
-        $cor_tema = '#e6b800'; // Amarelo
-    }
-
-    // 4. Formatação de Texto
+    // Formatação de variáveis para o layout original
     $placa = !empty($m['placa']) ? strtoupper($m['placa']) : 'SEM VEÍCULO';
     
     $modelo_cor = (!empty($m['modelo']) ? $m['modelo'] : '') . 
@@ -83,7 +77,6 @@ try {
             width: 8.5cm;
             height: 5.5cm;
             background: white;
-            /* Bordas Laterais e Inferior (8px) */
             border-left: 8px solid <?php echo $cor_tema; ?>;
             border-right: 8px solid <?php echo $cor_tema; ?>;
             border-bottom: 8px solid <?php echo $cor_tema; ?>;
@@ -95,7 +88,6 @@ try {
             position: relative;
         }
 
-        /* CABEÇALHO COLORIDO */
         .header-top {
             background-color: <?php echo $cor_tema; ?>;
             height: 45px;
@@ -103,7 +95,7 @@ try {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 8px; /* Espaçamento lateral */
+            padding: 0 8px;
             box-sizing: border-box;
         }
 
@@ -192,11 +184,11 @@ try {
     <div class="selo-card">
         <div class="header-top">
             <img src="../uploads/brasao.png" class="img-brasao" alt="Btl" onerror="this.style.opacity=0">
-            
             <img src="../uploads/brasao_eb.png" class="img-brasao" alt="EB" onerror="this.style.opacity=0">
         </div>
 
         <div class="conteudo">
+            
             <div class="placa-txt"><?php echo $placa; ?></div>
             <div class="veiculo-txt"><?php echo $modelo_cor; ?></div>
 

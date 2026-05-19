@@ -19,7 +19,7 @@ document.addEventListener('input', function (e) {
         el.value = v.length > 10 ? v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3") : v.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
     }
     if (el.name === 'cep') el.value = el.value.replace(/\D/g, "").substring(0, 8).replace(/^(\d{5})(\d{3})/, "$1-$2");
-    if (el.name === 'placa') el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 8);
+    if (el.name === 'placa' || el.name === 'v_placa') el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 8);
 });
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -105,6 +105,12 @@ async function salvarMilitar() {
                 const img = document.getElementById('imgPreview');
                 if(img) img.src = 'assets/sem_foto.png';
                 
+                // Trava a listagem de veículos novamente até abrir outro militar
+                const btnAdd = document.getElementById('btnAdicionarVeiculo');
+                if(btnAdd) btnAdd.disabled = true;
+                const tbody = document.getElementById('listaVeiculosMilitar');
+                if(tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-muted py-3">Primeiro salve os dados básicos do militar para poder gerenciar a frota.</td></tr>';
+
                 const firstTabEl = document.querySelector('#myTab button[data-bs-target="#basic"]');
                 if(firstTabEl) { const tab = new bootstrap.Tab(firstTabEl); tab.show(); }
 
@@ -141,13 +147,10 @@ async function carregarMilitarNoForm(id, modo) {
         setVal('endereco', d.endereco); setVal('num_residencia', d.num_residencia); setVal('bairro', d.bairro);
         setVal('cidade', d.cidade); setVal('estado', d.estado);
         setVal('cat_cnh', d.cat_cnh); setVal('validade_cnh', d.validade_cnh);
-        setVal('tipo_veic', d.tipo_veiculo); setVal('placa', d.placa); setVal('modelo', d.modelo);
-        setVal('cor', d.cor); setVal('validade_crlv', d.validade_crlv);
 
-        atualizarBadgeVisual(d.homologado == 1);
         if (d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
 
-        // LÓGICA DE EXIBIÇÃO DOS PDFs NO FORMULÁRIO DE EDIÇÃO/S2
+        // Exibição do PDF da CNH na Ficha Base
         const linkCnh = document.getElementById('link_pdf_cnh');
         if (linkCnh) {
             if (d.pdf_habilitacao) {
@@ -155,16 +158,6 @@ async function carregarMilitarNoForm(id, modo) {
                 linkCnh.classList.remove('d-none');
             } else {
                 linkCnh.classList.add('d-none');
-            }
-        }
-        
-        const linkCrlv = document.getElementById('link_pdf_crlv');
-        if (linkCrlv) {
-            if (d.pdf_veiculo) {
-                linkCrlv.innerHTML = `<a href="uploads/documentos/${d.pdf_veiculo}" target="_blank" class="badge bg-danger text-decoration-none py-1 mt-1"><i class="fas fa-external-link-alt"></i> Visualizar CRLV Anexado</a>`;
-                linkCrlv.classList.remove('d-none');
-            } else {
-                linkCrlv.classList.add('d-none');
             }
         }
 
@@ -198,16 +191,9 @@ async function carregarMilitarNoForm(id, modo) {
             badge.className = "badge bg-warning text-dark";
             try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if (tab) new bootstrap.Tab(tab).show(); } catch (e) { }
 
-            let buttonsS2 = `<div class="w-100 d-flex justify-content-between align-items-center"><button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button><div>`;
-            if (d.placa && d.placa.trim() !== "") {
-                if (d.homologado == 1) {
-                    buttonsS2 += `<button type="button" class="btn btn-success me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})"><i class="fas fa-check-double me-1"></i> Homologado</button><button type="button" class="btn btn-dark fw-bold" onclick="imprimirSelo(${d.id})"><i class="fas fa-print me-1"></i> Imprimir Selo</button>`;
-                } else {
-                    buttonsS2 += `<button type="button" class="btn btn-warning me-2 fw-bold" onclick="toggleHomologacaoForm(${d.id})"><i class="fas fa-stamp me-1"></i> HOMOLOGAR VEÍCULO</button>`;
-                }
-            } else { buttonsS2 += `<span class="badge bg-light text-secondary border p-2">Veículo não cadastrado</span>`; }
-            buttonsS2 += `</div></div>`;
-            footerBtns.innerHTML = buttonsS2;
+            // No modelo multi-veículos, a S2 homologa na própria tabela!
+            // Logo, o rodapé principal tem apenas o botão de Fechar.
+            footerBtns.innerHTML = `<div class="w-100 text-end"><button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button></div>`;
 
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
             inputs.forEach(el => el.setAttribute('readonly', true));
@@ -216,26 +202,157 @@ async function carregarMilitarNoForm(id, modo) {
             if (tabS1) tabS1.classList.add('d-none');
         }
 
+        // CARREGA A FROTA DO MILITAR
+        carregarVeiculosMilitar(d.id, modo);
+
     } catch (e) {
         console.error(e);
         Swal.fire('Erro', 'Não foi possível carregar os dados.', 'error');
     }
 }
 
-async function toggleHomologacaoForm(id) {
-    if (!confirm("Confirma a alteração do status de homologação?")) return;
+// -----------------------------------------------------------------------------
+// GESTÃO DE VEÍCULOS (VERSÃO 2.5 - MULTI VEÍCULOS)
+// -----------------------------------------------------------------------------
+
+async function carregarVeiculosMilitar(militarId, modo) {
+    const btnAdd = document.getElementById('btnAdicionarVeiculo');
+    let role = (window.currentUserRole || localStorage.getItem('sismil_role') || '').toLowerCase().trim();
+    
+    // Apenas Admin e Sargenteação podem adicionar
+    if (btnAdd) {
+        if (['admin', 'sargenteacao'].includes(role)) {
+            btnAdd.disabled = false;
+            btnAdd.setAttribute('onclick', `abrirModalVeiculo(${militarId})`);
+            btnAdd.classList.remove('d-none');
+        } else {
+            btnAdd.classList.add('d-none');
+        }
+    }
+
     try {
-        const res = await fetch('backend/toggle_homolog.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        const res = await fetch(`backend/get_veiculos.php?militar_id=${militarId}&v=${Date.now()}`);
+        const json = await res.json();
+        const tbody = document.getElementById('listaVeiculosMilitar');
+        tbody.innerHTML = '';
+
+        if (json.status === 'sucesso' && json.dados.length > 0) {
+            json.dados.forEach(v => {
+                const badgClass = v.homologado == 1 ? 'bg-success' : 'bg-warning text-dark';
+                const badgTxt = v.homologado == 1 ? 'HOMOLOGADO' : 'PENDENTE S2';
+                const linkPdf = v.pdf_veiculo ? `<a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="text-danger" title="Ver CRLV"><i class="fas fa-file-pdf fa-lg"></i></a>` : '<span class="text-muted">-</span>';
+                
+                let acoes = '';
+
+                if (['admin', 'sargenteacao'].includes(role)) {
+                    acoes = `
+                        <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1 me-1" onclick='editarVeiculo(${JSON.stringify(v)})' title="Editar"><i class="fas fa-edit"></i></button>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="excluirVeiculo(${v.id}, ${militarId})" title="Excluir"><i class="fas fa-trash"></i></button>
+                    `;
+                } else if (['s2', 'transporte'].includes(role)) {
+                    acoes = `
+                        <button type="button" class="btn btn-sm btn-warning py-0 px-1 fw-bold me-1" onclick="alterarHomologacaoVeiculo(${v.id}, ${militarId})" title="Mudar Status"><i class="fas fa-stamp"></i></button>
+                        <button type="button" class="btn btn-sm btn-dark py-0 px-1 fw-bold" onclick="imprimirSelo(${v.id})" title="Imprimir Selo"><i class="fas fa-print"></i></button>
+                    `;
+                }
+
+                const marcaTxt = v.marca ? `${v.marca} / ` : '';
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-secondary">${v.tipo_veiculo}</td>
+                        <td><span class="badge bg-light text-dark border border-dark text-uppercase fs-6">${v.placa}</span></td>
+                        <td>${marcaTxt}${v.modelo}</td>
+                        <td>${v.cor}</td>
+                        <td>${v.validade_crlv ? v.validade_crlv.split('-').reverse().join('/') : '---'}</td>
+                        <td>${linkPdf}</td>
+                        <td><span class="badge ${badgClass}">${badgTxt}</span></td>
+                        <td>${acoes}</td>
+                    </tr>
+                `;
+            });
+        } else {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-muted py-4">Nenhum veículo cadastrado para este militar.</td></tr>';
+        }
+    } catch (e) { console.error(e); }
+}
+
+function abrirModalVeiculo(militarId) {
+    document.getElementById('formVeiculo').reset();
+    document.getElementById('veiculo_id').value = '';
+    document.getElementById('v_militar_id').value = militarId;
+    document.getElementById('modalVeiculoTitle').innerHTML = '<i class="fas fa-car me-2"></i> Adicionar Veículo';
+    document.getElementById('v_link_pdf').classList.add('d-none');
+    new bootstrap.Modal(document.getElementById('modalVeiculo')).show();
+}
+
+function editarVeiculo(v) {
+    document.getElementById('formVeiculo').reset();
+    document.getElementById('veiculo_id').value = v.id;
+    document.getElementById('v_militar_id').value = v.militar_id;
+    document.getElementById('v_tipo').value = v.tipo_veiculo;
+    document.getElementById('v_placa').value = v.placa;
+    document.getElementById('v_marca').value = v.marca || '';
+    document.getElementById('v_modelo').value = v.modelo;
+    document.getElementById('v_cor').value = v.cor;
+    document.getElementById('v_validade').value = v.validade_crlv || '';
+    
+    const link = document.getElementById('v_link_pdf');
+    if (v.pdf_veiculo) {
+        link.innerHTML = `<a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="badge bg-danger text-decoration-none py-1"><i class="fas fa-file-pdf"></i> Ver CRLV Atual</a>`;
+        link.classList.remove('d-none');
+    } else { link.classList.add('d-none'); }
+    
+    document.getElementById('modalVeiculoTitle').innerHTML = '<i class="fas fa-edit me-2"></i> Editar Veículo';
+    new bootstrap.Modal(document.getElementById('modalVeiculo')).show();
+}
+
+async function salvarVeiculo() {
+    const form = document.getElementById('formVeiculo');
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    
+    const fd = new FormData(form);
+    const militarId = document.getElementById('v_militar_id').value;
+    
+    try {
+        const res = await fetch('backend/save_veiculo.php', { method: 'POST', body: fd });
         const json = await res.json();
         if (json.status === 'sucesso') {
-            carregarMilitarNoForm(id, 'reload');
+            const modalEl = document.getElementById('modalVeiculo');
+            bootstrap.Modal.getInstance(modalEl).hide();
+            carregarVeiculosMilitar(militarId, 'edit');
             atualizarDashboard();
-            atualizarListagem();
-            const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 2000 });
-            Toast.fire({ icon: 'success', title: 'Status atualizado!' });
-        } else { alert("Erro: " + json.msg); }
-    } catch (e) { console.error(e); alert("Erro de conexão"); }
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Veículo Salvo!', showConfirmButton: false, timer: 2000 });
+        } else { Swal.fire('Erro', json.msg, 'error'); }
+    } catch (e) { console.error(e); }
 }
+
+async function excluirVeiculo(id, militarId) {
+    if (!confirm("Deseja realmente excluir este veículo?")) return;
+    try {
+        const res = await fetch('backend/excluir_veiculo.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        const json = await res.json();
+        if(json.status === 'sucesso'){
+            carregarVeiculosMilitar(militarId, 'edit');
+            atualizarDashboard();
+        } else { alert("Erro: " + json.msg); }
+    } catch (e) { console.error(e); }
+}
+
+async function alterarHomologacaoVeiculo(id, militarId) {
+    if (!confirm("Confirma a alteração do status de homologação deste veículo?")) return;
+    try {
+        const res = await fetch('backend/toggle_homolog_veiculo.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
+        const json = await res.json();
+        if(json.status === 'sucesso'){
+            carregarVeiculosMilitar(militarId, 's2');
+            atualizarDashboard();
+        } else { alert("Erro: " + json.msg); }
+    } catch (e) { console.error(e); }
+}
+
+// -----------------------------------------------------------------------------
+// BUSCAS E VISUALIZAÇÃO
+// -----------------------------------------------------------------------------
 
 async function realizarBusca(e, tipo) {
     if (e) e.preventDefault();
@@ -342,6 +459,102 @@ async function verDetalhesMilitar(id) {
     finally { document.body.style.cursor = 'default'; }
 }
 
+async function abrirModalLeitura(id) {
+    document.body.style.cursor = 'wait';
+
+    try {
+        const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
+        const json = await res.json();
+
+        if (json.status === 'sucesso') {
+            const d = json.dados;
+            const txt = (v) => (v && v !== 'null' && String(v).trim() !== '') ? v : '---';
+            const data = (dt) => (dt && dt.length === 10) ? dt.split('-').reverse().join('/') : '---';
+
+            document.getElementById('f_foto').src = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
+            document.getElementById('f_posto').innerText = txt(d.posto_grad);
+            document.getElementById('f_guerra').innerText = txt(d.nome_guerra);
+            document.getElementById('f_nome_completo').innerText = txt(d.nome_completo);
+            document.getElementById('f_su').innerText = txt(d.subunidade);
+            document.getElementById('f_secao').innerText = txt(d.pelotao) + (d.secao ? ` / ${d.secao}` : '');
+            document.getElementById('f_qmg').innerText = txt(d.qmg);
+
+            document.getElementById('f_cpf').innerText = txt(d.identidade);
+            document.getElementById('f_idt').innerText = txt(d.idt_militar);
+            document.getElementById('f_numero').innerText = txt(d.numero);
+            document.getElementById('f_nasc').innerText = data(d.dt_nascimento);
+            document.getElementById('f_sangue').innerText = txt(d.tipo_sanguineo);
+            document.getElementById('f_praca').innerText = data(d.dt_praca);
+
+            document.getElementById('f_cel1').innerText = txt(d.celular_princ);
+            document.getElementById('f_cel2').innerText = txt(d.celular_sec);
+            document.getElementById('f_email').innerText = txt(d.email);
+            document.getElementById('f_end').innerText = txt(d.endereco);
+            document.getElementById('f_end_num').innerText = txt(d.num_residencia);
+            document.getElementById('f_bairro').innerText = txt(d.bairro);
+            document.getElementById('f_cidade').innerText = `${txt(d.cidade)} - ${txt(d.estado)}`;
+            document.getElementById('f_cep').innerText = txt(d.cep);
+            document.getElementById('f_resp_nome').innerText = txt(d.nome_resp);
+            document.getElementById('f_resp_tel').innerText = txt(d.tel_resp);
+
+            // AQUI É A LÓGICA DO PDF DA CNH
+            document.getElementById('f_cnh_cat').innerHTML = txt(d.cat_cnh) + (d.pdf_habilitacao ? ` <a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
+            document.getElementById('f_cnh_val').innerText = data(d.validade_cnh);
+            
+            // CARREGA MÚLTIPLOS VEÍCULOS DINAMICAMENTE NA FICHA DE LEITURA
+            const resVeic = await fetch(`backend/get_veiculos.php?militar_id=${id}&v=${Date.now()}`);
+            const jsonVeic = await resVeic.json();
+            
+            const fStatus = document.getElementById('f_status');
+            const fPlaca = document.getElementById('f_placa');
+            const fModelo = document.getElementById('f_modelo');
+            const fCor = document.getElementById('f_cor');
+            const fCrlv = document.getElementById('f_crlv');
+
+            if(jsonVeic.status === 'sucesso' && jsonVeic.dados.length > 0) {
+                let vHtmlPlaca = ''; let vHtmlModelo = ''; let vHtmlCor = ''; let vHtmlCrlv = ''; let vHtmlStatus = '';
+                
+                jsonVeic.dados.forEach(v => {
+                    vHtmlPlaca += `<div class="bg-light border border-dark rounded text-center fw-bold font-monospace py-1 mb-1">${v.placa}</div>`;
+                    vHtmlModelo += `<div class="fw-bold pt-1 mb-1 text-truncate">${v.marca ? v.marca + ' / ' : ''}${v.modelo}</div>`;
+                    vHtmlCor += `<div class="fw-bold pt-1 mb-1">${v.cor}</div>`;
+                    
+                    const crlvDoc = v.pdf_veiculo ? ` <a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="text-danger ms-2" title="Ver PDF"><i class="fas fa-file-pdf"></i></a>` : '';
+                    vHtmlCrlv += `<div class="fw-bold pt-1 mb-1">${v.validade_crlv ? v.validade_crlv.split('-').reverse().join('/') : '---'}${crlvDoc}</div>`;
+                    
+                    vHtmlStatus += `<div class="pt-1 mb-1">${v.homologado == 1 ? '<span class="badge bg-success">LIBERADO</span>' : '<span class="badge bg-warning text-dark">PENDENTE</span>'}</div>`;
+                });
+                
+                if (fPlaca) fPlaca.innerHTML = vHtmlPlaca;
+                if (fModelo) fModelo.innerHTML = vHtmlModelo;
+                if (fCor) fCor.innerHTML = vHtmlCor;
+                if (fCrlv) fCrlv.innerHTML = vHtmlCrlv;
+                if (fStatus) fStatus.innerHTML = vHtmlStatus;
+            } else {
+                if (fPlaca) fPlaca.innerHTML = '<span class="badge bg-light text-muted border p-1">S/ VEÍCULO</span>';
+                if (fModelo) fModelo.innerHTML = '---';
+                if (fCor) fCor.innerHTML = '---';
+                if (fCrlv) fCrlv.innerHTML = '---';
+                if (fStatus) fStatus.innerHTML = '---';
+            }
+
+            new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
+
+        } else {
+            alert("Erro: " + json.msg);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Erro de conexão ao buscar dados.");
+    } finally {
+        document.body.style.cursor = 'default';
+    }
+}
+
+// -----------------------------------------------------------------------------
+// UTILITÁRIOS E HISTÓRICO
+// -----------------------------------------------------------------------------
+
 function popularSelects() {
     const sp = document.getElementById('selectPosto'), sc = document.getElementById('searchPosto');
     postos.forEach(p => { if (sp) sp.add(new Option(p, p)); if (sc) sc.add(new Option(p, p)) });
@@ -373,10 +586,6 @@ function aplicarPermissoes(role) {
     }
 }
 
-function atualizarBadgeVisual(check) {
-    const b = document.getElementById('vehicleStatusBadge');
-    if (b) { b.className = check ? "status-badge status-ok" : "status-badge status-analise"; b.innerHTML = check ? '<i class="fas fa-check-circle"></i> HOMOLOGADO' : '<i class="fas fa-clock"></i> PENDENTE'; }
-}
 function previewImage(input) { if (input.files && input.files[0]) { var reader = new FileReader(); reader.onload = function (e) { document.getElementById('imgPreview').src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
 function atualizarDashboard() { fetch('backend/dashboard_stats.php').then(r => r.json()).then(j => { if (j.status === 'sucesso') { document.getElementById('dashMilitares').innerText = j.militares; document.getElementById('dashVeiculos').innerText = j.veiculos; document.getElementById('dashPendentes').innerText = j.pendentes; document.getElementById('dashboardPanel').classList.remove('hidden'); } }) }
 async function realizarLogout() { await fetch('backend/logout.php'); location.reload(); }
@@ -397,6 +606,7 @@ async function carregarListaUsuarios() {
         }
     } catch (e) { console.error(e); }
 }
+
 async function excluirUsuario(id) { if (confirm('Apagar usuário?')) { await fetch('backend/delete_user.php', { method: 'POST', body: JSON.stringify({ id }) }); carregarListaUsuarios(); } }
 async function criarUsuario(e) { e.preventDefault(); const fd = new FormData(document.getElementById('formCreateUser')); const url = document.getElementById('edit_id').value ? 'backend/update_user.php' : 'backend/create_user.php'; await fetch(url, { method: 'POST', body: JSON.stringify(Object.fromEntries(fd)) }); document.getElementById('formCreateUser').reset(); carregarListaUsuarios(); }
 function resetarFormularioUsuario() { document.getElementById('formCreateUser').reset(); document.getElementById('edit_id').value = ''; document.querySelector('[name="new_user_idt"]').removeAttribute('readonly'); document.querySelector('#formCreateUser button[type="submit"]').innerHTML = '<i class="fas fa-save me-1"></i> Salvar Dados'; }
@@ -437,9 +647,10 @@ function limparFormulario() {
     }
 }
 function imprimirSelo(id) {
+    // Agora o id passado é o ID do VEÍCULO, não mais do militar
     const width = 600; const height = 400;
     const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
-    window.open(`backend/print_selo.php?id=${id}`, 'ImprimirSelo', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
+    window.open(`backend/print_selo.php?veiculo_id=${id}`, 'ImprimirSelo', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
 }
 
 function atualizarListagem() {
@@ -457,7 +668,7 @@ async function excluirMilitar() {
 
     const result = await Swal.fire({
         title: 'Tem certeza?',
-        text: "Essa ação não pode ser desfeita!",
+        text: "Essa ação apagará o militar, seu histórico e toda a sua frota de veículos permanentemente!",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -486,75 +697,6 @@ async function excluirMilitar() {
         } catch (e) {
             Swal.fire('Erro', 'Erro de conexão.', 'error');
         }
-    }
-}
-
-async function abrirModalLeitura(id) {
-    document.body.style.cursor = 'wait';
-
-    try {
-        const res = await fetch(`backend/get_militar.php?id=${id}&v=${Date.now()}`);
-        const json = await res.json();
-
-        if (json.status === 'sucesso') {
-            const d = json.dados;
-            const txt = (v) => (v && v !== 'null' && String(v).trim() !== '') ? v : '---';
-            const data = (dt) => (dt && dt.length === 10) ? dt.split('-').reverse().join('/') : '---';
-
-            document.getElementById('f_foto').src = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
-            document.getElementById('f_posto').innerText = txt(d.posto_grad);
-            document.getElementById('f_guerra').innerText = txt(d.nome_guerra);
-            document.getElementById('f_nome_completo').innerText = txt(d.nome_completo);
-            document.getElementById('f_su').innerText = txt(d.subunidade);
-            document.getElementById('f_secao').innerText = txt(d.pelotao) + (d.secao ? ` / ${d.secao}` : '');
-            document.getElementById('f_qmg').innerText = txt(d.qmg);
-
-            document.getElementById('f_cpf').innerText = txt(d.identidade);
-            document.getElementById('f_idt').innerText = txt(d.idt_militar);
-            document.getElementById('f_numero').innerText = txt(d.numero);
-            document.getElementById('f_nasc').innerText = data(d.dt_nascimento);
-            document.getElementById('f_sangue').innerText = txt(d.tipo_sanguineo);
-            document.getElementById('f_praca').innerText = data(d.dt_praca);
-
-            document.getElementById('f_cel1').innerText = txt(d.celular_princ);
-            document.getElementById('f_cel2').innerText = txt(d.celular_sec);
-            document.getElementById('f_email').innerText = txt(d.email);
-            document.getElementById('f_end').innerText = txt(d.endereco);
-            document.getElementById('f_end_num').innerText = txt(d.num_residencia);
-            document.getElementById('f_bairro').innerText = txt(d.bairro);
-            document.getElementById('f_cidade').innerText = `${txt(d.cidade)} - ${txt(d.estado)}`;
-            document.getElementById('f_cep').innerText = txt(d.cep);
-            document.getElementById('f_resp_nome').innerText = txt(d.nome_resp);
-            document.getElementById('f_resp_tel').innerText = txt(d.tel_resp);
-
-            // AQUI É A LÓGICA DO PDF PARA A VISUALIZAÇÃO LEITURA DA FICHA
-            document.getElementById('f_cnh_cat').innerHTML = txt(d.cat_cnh) + (d.pdf_habilitacao ? ` <a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
-            document.getElementById('f_cnh_val').innerText = data(d.validade_cnh);
-            document.getElementById('f_crlv').innerHTML = data(d.validade_crlv) + (d.pdf_veiculo ? ` <a href="uploads/documentos/${d.pdf_veiculo}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
-
-            document.getElementById('f_placa').innerText = txt(d.placa);
-            document.getElementById('f_modelo').innerText = txt(d.modelo);
-            document.getElementById('f_cor').innerText = txt(d.cor);
-
-            const badge = document.getElementById('f_status');
-            if (d.placa && d.placa.length > 2) {
-                badge.innerHTML = d.homologado == 1
-                    ? '<span class="badge bg-success">LIBERADO</span>'
-                    : '<span class="badge bg-warning text-dark">PENDENTE S2</span>';
-            } else {
-                badge.innerHTML = '<span class="badge bg-light text-muted border">S/ VEÍCULO</span>';
-            }
-
-            new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
-
-        } else {
-            alert("Erro: " + json.msg);
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Erro de conexão ao buscar dados.");
-    } finally {
-        document.body.style.cursor = 'default';
     }
 }
 
