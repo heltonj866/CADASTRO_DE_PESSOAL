@@ -18,9 +18,35 @@ document.addEventListener('input', function (e) {
         let v = el.value.replace(/\D/g, "").substring(0, 11);
         el.value = v.length > 10 ? v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3") : v.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
     }
-    if (el.name === 'cep') el.value = el.value.replace(/\D/g, "").substring(0, 8).replace(/^(\d{5})(\d{3})/, "$1-$2");
-    if (el.name === 'placa' || el.name === 'v_placa') el.value = el.value.toUpperCase().replace(/[^A-Z0-9]/g, "").substring(0, 8);
+    if (el.name === 'cep') {
+        let v = el.value.replace(/\D/g, "");
+        el.value = v.substring(0, 8).replace(/^(\d{5})(\d{3})/, "$1-$2");
+        if (v.length === 8) buscarCEP(v);
+    }
 });
+
+async function buscarCEP(cep) {
+    try {
+        const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+        const json = await res.json();
+        if (!json.erro) {
+            const end = document.querySelector('input[name="endereco"]');
+            const bai = document.querySelector('input[name="bairro"]');
+            const cid = document.querySelector('input[name="cidade"]');
+            const uf = document.querySelector('input[name="estado"]');
+            
+            if (end) end.value = json.logradouro;
+            if (bai) bai.value = json.bairro;
+            if (cid) cid.value = json.localidade;
+            if (uf) uf.value = json.uf;
+            
+            const numInput = document.querySelector('input[name="num_residencia"]');
+            if (numInput) numInput.focus();
+        } else {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'warning', title: 'CEP não encontrado.', showConfirmButton: false, timer: 2000 });
+        }
+    } catch (e) { console.error("Erro CEP:", e); }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     popularSelects();
@@ -87,13 +113,7 @@ async function salvarMilitar() {
         const json = await res.json();
 
         if (json.status === 'sucesso') {
-            const Toast = Swal.mixin({
-                toast: true,
-                position: 'top-end',
-                showConfirmButton: false,
-                timer: 3000,
-                timerProgressBar: true
-            });
+            const Toast = Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 3000, timerProgressBar: true });
             Toast.fire({ icon: 'success', title: 'Salvo com sucesso!' });
 
             if(typeof atualizarDashboard === 'function') atualizarDashboard();   
@@ -105,7 +125,6 @@ async function salvarMilitar() {
                 const img = document.getElementById('imgPreview');
                 if(img) img.src = 'assets/sem_foto.png';
                 
-                // Trava a listagem de veículos novamente até abrir outro militar
                 const btnAdd = document.getElementById('btnAdicionarVeiculo');
                 if(btnAdd) btnAdd.disabled = true;
                 const tbody = document.getElementById('listaVeiculosMilitar');
@@ -150,15 +169,12 @@ async function carregarMilitarNoForm(id, modo) {
 
         if (d.foto_path) document.getElementById('imgPreview').src = `uploads/${d.foto_path}`;
 
-        // Exibição do PDF da CNH na Ficha Base
         const linkCnh = document.getElementById('link_pdf_cnh');
         if (linkCnh) {
             if (d.pdf_habilitacao) {
                 linkCnh.innerHTML = `<a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="badge bg-danger text-decoration-none py-1 mt-1"><i class="fas fa-external-link-alt"></i> Visualizar CNH Anexada</a>`;
                 linkCnh.classList.remove('d-none');
-            } else {
-                linkCnh.classList.add('d-none');
-            }
+            } else { linkCnh.classList.add('d-none'); }
         }
 
         document.getElementById('fullRegistrationCard').classList.remove('hidden');
@@ -168,6 +184,9 @@ async function carregarMilitarNoForm(id, modo) {
         const footerBtns = document.getElementById('formFooterButtons');
         let role = (window.currentUserRole || localStorage.getItem('sismil_role') || '').toLowerCase().trim();
         const tabS1 = document.getElementById('tab-s1');
+        
+        // Verifica se o militar está desligado
+        const isDesligado = (d.status_ativo == 0);
 
         if (['admin', 'sargenteacao'].includes(role)) {
             if (tabS1) tabS1.classList.remove('d-none');
@@ -175,9 +194,33 @@ async function carregarMilitarNoForm(id, modo) {
 
             badge.innerText = "Edição de Cadastro";
             badge.className = "badge bg-primary";
+
+            // Injeta o botão do Dossier e os botões de Desligamento
+            let actBtns = `<a href="backend/dossier_militar.php?id=${d.id}" target="_blank" class="btn btn-dark fw-bold me-2"><i class="fas fa-file-contract me-1"></i> Gerar Dossier (PDF)</a>`;
+            
+            if (!isDesligado) {
+                actBtns += `<button type="button" class="btn btn-outline-danger me-2" onclick="desligarMilitar(${d.id}, '${d.posto_grad} ${d.nome_guerra}')"><i class="fas fa-user-slash me-1"></i> Desligar Militar</button>`;
+            } else {
+                actBtns += `<span class="badge bg-danger fs-6 align-self-center me-2"><i class="fas fa-user-slash"></i> DESLIGADO</span>`;
+                if (d.pdf_nada_consta) {
+                    actBtns += `<a href="uploads/documentos/${d.pdf_nada_consta}" target="_blank" class="btn btn-sm btn-outline-danger me-2"><i class="fas fa-file-pdf"></i> PDF Desligamento</a>`;
+                }
+                // NOVO: Botão de Reativar
+                actBtns += `<button type="button" class="btn btn-success fw-bold me-2" onclick="reativarMilitar(${d.id}, '${d.posto_grad} ${d.nome_guerra}')"><i class="fas fa-user-plus me-1"></i> Reativar Militar</button>`;
+            }
+
+            if (role === 'admin') {
+                actBtns += `<button type="button" class="btn btn-outline-dark border-0" onclick="excluirMilitar()" title="Apagar Permanentemente"><i class="fas fa-trash-alt"></i></button>`;
+            }
+
             footerBtns.innerHTML = `
-                <button type="button" id="btnExcluir" class="btn btn-outline-danger ${role === 'admin' ? '' : 'd-none'}" onclick="excluirMilitar()"><i class="fas fa-trash-alt me-1"></i> Excluir</button>
-                <div><button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Cancelar</button><button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar Dados</button></div>`;
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>${actBtns}</div>
+                    <div>
+                        <button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Cancelar</button>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar Dados</button>
+                    </div>
+                </div>`;
 
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
             inputs.forEach(el => el.removeAttribute('readonly'));
@@ -191,8 +234,6 @@ async function carregarMilitarNoForm(id, modo) {
             badge.className = "badge bg-warning text-dark";
             try { const tab = document.querySelector('button[data-bs-target="#vehicle"]'); if (tab) new bootstrap.Tab(tab).show(); } catch (e) { }
 
-            // No modelo multi-veículos, a S2 homologa na própria tabela!
-            // Logo, o rodapé principal tem apenas o botão de Fechar.
             footerBtns.innerHTML = `<div class="w-100 text-end"><button type="button" class="btn btn-secondary" onclick="limparFormulario()">Fechar Ficha</button></div>`;
 
             const inputs = document.querySelectorAll('#militaryForm input, #militaryForm select');
@@ -202,7 +243,6 @@ async function carregarMilitarNoForm(id, modo) {
             if (tabS1) tabS1.classList.add('d-none');
         }
 
-        // CARREGA A FROTA DO MILITAR
         carregarVeiculosMilitar(d.id, modo);
 
     } catch (e) {
@@ -212,22 +252,19 @@ async function carregarMilitarNoForm(id, modo) {
 }
 
 // -----------------------------------------------------------------------------
-// GESTÃO DE VEÍCULOS (VERSÃO 2.5 - MULTI VEÍCULOS)
+// GESTÃO DE VEÍCULOS
 // -----------------------------------------------------------------------------
 
 async function carregarVeiculosMilitar(militarId, modo) {
     const btnAdd = document.getElementById('btnAdicionarVeiculo');
     let role = (window.currentUserRole || localStorage.getItem('sismil_role') || '').toLowerCase().trim();
     
-    // Apenas Admin e Sargenteação podem adicionar
     if (btnAdd) {
         if (['admin', 'sargenteacao'].includes(role)) {
             btnAdd.disabled = false;
             btnAdd.setAttribute('onclick', `abrirModalVeiculo(${militarId})`);
             btnAdd.classList.remove('d-none');
-        } else {
-            btnAdd.classList.add('d-none');
-        }
+        } else { btnAdd.classList.add('d-none'); }
     }
 
     try {
@@ -241,6 +278,7 @@ async function carregarVeiculosMilitar(militarId, modo) {
                 const badgClass = v.homologado == 1 ? 'bg-success' : 'bg-warning text-dark';
                 const badgTxt = v.homologado == 1 ? 'HOMOLOGADO' : 'PENDENTE S2';
                 const linkPdf = v.pdf_veiculo ? `<a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="text-danger" title="Ver CRLV"><i class="fas fa-file-pdf fa-lg"></i></a>` : '<span class="text-muted">-</span>';
+                const obsAviso = v.observacao_s2 ? `<div class="text-danger small mt-1 fw-bold" style="line-height:1.1;"><i class="fas fa-exclamation-triangle"></i> ${v.observacao_s2}</div>` : '';
                 
                 let acoes = '';
 
@@ -251,7 +289,7 @@ async function carregarVeiculosMilitar(militarId, modo) {
                     `;
                 } else if (['s2', 'transporte'].includes(role)) {
                     acoes = `
-                        <button type="button" class="btn btn-sm btn-warning py-0 px-1 fw-bold me-1" onclick="alterarHomologacaoVeiculo(${v.id}, ${militarId})" title="Mudar Status"><i class="fas fa-stamp"></i></button>
+                        <button type="button" class="btn btn-sm btn-warning py-0 px-1 fw-bold me-1" onclick="alterarHomologacaoVeiculo(${v.id}, ${militarId}, ${v.homologado}, \`${v.observacao_s2 || ''}\`)" title="Avaliar Veículo"><i class="fas fa-stamp"></i></button>
                         <button type="button" class="btn btn-sm btn-dark py-0 px-1 fw-bold" onclick="imprimirSelo(${v.id})" title="Imprimir Selo"><i class="fas fa-print"></i></button>
                     `;
                 }
@@ -265,7 +303,7 @@ async function carregarVeiculosMilitar(militarId, modo) {
                         <td>${v.cor}</td>
                         <td>${v.validade_crlv ? v.validade_crlv.split('-').reverse().join('/') : '---'}</td>
                         <td>${linkPdf}</td>
-                        <td><span class="badge ${badgClass}">${badgTxt}</span></td>
+                        <td><span class="badge ${badgClass}">${badgTxt}</span>${obsAviso}</td>
                         <td>${acoes}</td>
                     </tr>
                 `;
@@ -338,21 +376,137 @@ async function excluirVeiculo(id, militarId) {
     } catch (e) { console.error(e); }
 }
 
-async function alterarHomologacaoVeiculo(id, militarId) {
-    if (!confirm("Confirma a alteração do status de homologação deste veículo?")) return;
-    try {
-        const res = await fetch('backend/toggle_homolog_veiculo.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
-        const json = await res.json();
-        if(json.status === 'sucesso'){
-            carregarVeiculosMilitar(militarId, 's2');
-            atualizarDashboard();
-        } else { alert("Erro: " + json.msg); }
-    } catch (e) { console.error(e); }
+async function alterarHomologacaoVeiculo(id, militarId, statusAtual, obsAtual) {
+    const { value: formValues } = await Swal.fire({
+        title: 'Avaliação da S2',
+        html:
+            `<div class="text-start mb-2 fw-bold">Status do Veículo:</div>
+            <select id="swal-status" class="form-select mb-3">
+                <option value="1" ${statusAtual == 1 ? 'selected' : ''}>🟢 LIBERADO (Aprovado)</option>
+                <option value="0" ${statusAtual == 0 ? 'selected' : ''}>🔴 PENDENTE / REJEITADO</option>
+            </select>
+            <div class="text-start mb-2 fw-bold">Observações (Notificar Militar):</div>
+            <textarea id="swal-obs" class="form-control" placeholder="Ex: Falta anexar a CNH, CRLV ilegível, etc..." rows="3">${obsAtual || ''}</textarea>`,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonColor: '#3085d6',
+        cancelButtonColor: '#d33',
+        confirmButtonText: '<i class="fas fa-save"></i> Salvar Avaliação',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            return {
+                status: document.getElementById('swal-status').value,
+                obs: document.getElementById('swal-obs').value
+            }
+        }
+    });
+
+    if (formValues) {
+        try {
+            const res = await fetch('backend/toggle_homolog_veiculo.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, status: formValues.status, observacao: formValues.obs })
+            });
+            const json = await res.json();
+            
+            if(json.status === 'sucesso'){
+                carregarVeiculosMilitar(militarId, 's2');
+                atualizarDashboard();
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Avaliação salva!', showConfirmButton: false, timer: 1500 });
+            } else { 
+                Swal.fire("Erro", json.msg, "error"); 
+            }
+        } catch (e) { console.error(e); }
+    }
 }
 
 // -----------------------------------------------------------------------------
-// BUSCAS E VISUALIZAÇÃO
+// BUSCAS E DESLIGAMENTO
 // -----------------------------------------------------------------------------
+
+async function desligarMilitar(id, postoNome) {
+    const { value: arquivoPdf } = await Swal.fire({
+        title: 'Desligamento de Militar',
+        html: `
+            <div class="alert alert-danger text-start small mb-3">
+                <strong>Atenção:</strong> Está prestes a desligar o militar <b>${postoNome}</b>. O histórico será mantido. 
+                <br><br><b>É obrigatório anexar o NADA DEVE (PDF).</b>
+            </div>
+            <div class="text-start fw-bold mb-2">Anexar Ficha de Nada Deve:</div>
+            <input type="file" id="swal-nada-deve" class="form-control border-danger" accept="application/pdf">
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '<i class="fas fa-user-slash"></i> Confirmar Desligamento',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            const arquivo = document.getElementById('swal-nada-deve').files[0];
+            if (!arquivo) { Swal.showValidationMessage('Obrigatório anexar o PDF do Nada Deve para prosseguir.'); return false; }
+            if (arquivo.type !== 'application/pdf') { Swal.showValidationMessage('O ficheiro tem de ser no formato PDF.'); return false; }
+            return arquivo;
+        }
+    });
+
+    if (arquivoPdf) {
+        const formData = new FormData();
+        formData.append('militar_id', id);
+        formData.append('nada_consta', arquivoPdf);
+
+        Swal.fire({ title: 'A processar desligamento...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+        try {
+            const res = await fetch('backend/desligar_militar.php', { method: 'POST', body: formData });
+            const json = await res.json();
+            
+            if (json.status === 'sucesso') {
+                Swal.fire('Desligado!', json.msg, 'success');
+                atualizarListagem();
+                const idAberto = document.getElementById('militarId')?.value;
+                if(idAberto == id) carregarMilitarNoForm(id, 'edit');
+            } else { Swal.fire('Erro', json.msg, 'error'); }
+        } catch (e) { Swal.fire('Erro', 'Falha na comunicação com o servidor.', 'error'); }
+    }
+}
+
+async function reativarMilitar(id, postoNome) {
+    const result = await Swal.fire({
+        title: 'Reativar Cadastro?',
+        html: `Deseja reintegrar o militar <b>${postoNome}</b> ao Efetivo Pronto do Batalhão?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#198754',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: '<i class="fas fa-user-check"></i> Sim, Reativar',
+        cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+        Swal.fire({ title: 'Reativando...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
+
+        try {
+            const res = await fetch('backend/reativar_militar.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id })
+            });
+            const json = await res.json();
+            
+            if (json.status === 'sucesso') {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Militar Reativado!', showConfirmButton: false, timer: 2000 });
+                atualizarListagem();
+                
+                // Se a ficha desse militar estiver aberta, atualiza a tela na hora
+                const idAberto = document.getElementById('militarId')?.value;
+                if(idAberto == id) {
+                    carregarMilitarNoForm(id, 'edit');
+                }
+            } else { Swal.fire('Erro', json.msg, 'error'); }
+        } catch (e) { Swal.fire('Erro', 'Falha na comunicação.', 'error'); }
+    }
+}
 
 async function realizarBusca(e, tipo) {
     if (e) e.preventDefault();
@@ -365,7 +519,8 @@ async function realizarBusca(e, tipo) {
         const t = document.querySelector('#searchFormGeneral input[type="text"]').value;
         const p = document.getElementById('searchPosto').value;
         const q = document.getElementById('searchQMG').value;
-        url += `&termo=${t}&posto=${p}&qmg=${q}`;
+        const incInativos = document.getElementById('chkInativos') && document.getElementById('chkInativos').checked ? 1 : 0;
+        url += `&termo=${t}&posto=${p}&qmg=${q}&inativos=${incInativos}`;
     } else {
         const f = document.querySelector('input[name="filtroCnh"]:checked')?.value || 'TODAS';
         url += `&filtro_cnh=${f}`;
@@ -385,9 +540,19 @@ async function realizarBusca(e, tipo) {
             json.dados.forEach(m => {
                 const foto = m.foto_path ? `uploads/${m.foto_path}` : 'assets/sem_foto.png';
                 let btnAcao = '';
+                
+                const isDesligado = (m.status_ativo == 0);
+                const badgeDesligado = isDesligado ? `<div class="mt-1"><span class="badge bg-danger"><i class="fas fa-user-slash"></i> DESLIGADO</span></div>` : '';
+                const linkPdf = (isDesligado && m.pdf_nada_consta) ? `<div class="mt-1"><a href="uploads/documentos/${m.pdf_nada_consta}" target="_blank" class="text-danger small text-decoration-none fw-bold"><i class="fas fa-file-pdf"></i> Nada Deve</a></div>` : '';
 
                 if (['admin', 'sargenteacao'].includes(role)) {
                     btnAcao = `<button class="btn btn-sm btn-outline-primary w-100 mb-1" onclick="carregarMilitarNoForm(${m.id}, 'edit')"><i class="fas fa-edit me-1"></i> Editar</button>`;
+                    if (!isDesligado) {
+                        btnAcao += `<button class="btn btn-sm btn-outline-danger w-100 mb-1" onclick="desligarMilitar(${m.id}, '${m.posto_grad} ${m.nome_guerra}')"><i class="fas fa-user-slash me-1"></i> Desligar</button>`;
+                    } else {
+                        // NOVO: Botão Verde na lista
+                        btnAcao += `<button class="btn btn-sm btn-success w-100 mb-1" onclick="reativarMilitar(${m.id}, '${m.posto_grad} ${m.nome_guerra}')"><i class="fas fa-user-plus me-1"></i> Reativar</button>`;
+                    }
                 } else if (['s2', 'transporte'].includes(role)) {
                     btnAcao = `<button class="btn btn-sm btn-warning w-100 mb-1 fw-bold" onclick="carregarMilitarNoForm(${m.id}, 'homolog')"><i class="fas fa-search me-1"></i> Inspecionar</button>`;
                 } else {
@@ -397,13 +562,15 @@ async function realizarBusca(e, tipo) {
 
                 area.innerHTML += `
                 <div class="col-md-3 mb-3">
-                    <div class="card h-100 shadow-sm">
+                    <div class="card h-100 shadow-sm border-0" style="${isDesligado ? 'opacity: 0.8;' : ''}">
                         <div style="height:200px;overflow:hidden;background:#f0f0f0;">
                              <img src="${foto}" style="width:100%;height:100%;object-fit:cover;" onerror="this.src='assets/sem_foto.png'">
                         </div>
                         <div class="card-body text-center p-2">
-                            <h6 class="fw-bold m-0">${m.posto_grad} ${m.nome_guerra}</h6>
+                            <h6 class="fw-bold m-0 ${isDesligado ? 'text-danger' : ''}">${m.posto_grad} ${m.nome_guerra}</h6>
                             <small class="text-muted">${m.subunidade}</small>
+                            ${badgeDesligado}
+                            ${linkPdf}
                             <div class="mt-2">${btnAcao}${btnResumo}</div>
                         </div>
                     </div>
@@ -432,8 +599,11 @@ async function verDetalhesMilitar(id) {
 
             const foto = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
             document.getElementById('visFoto').src = foto;
+            
+            const isDesligado = d.status_ativo == 0;
+            const aviso = isDesligado ? '<span class="text-danger fw-bold border border-danger px-1 me-1 rounded">DESLIGADO</span> ' : '';
 
-            document.getElementById('visGuerra').innerText = txt(d.nome_guerra);
+            document.getElementById('visGuerra').innerHTML = aviso + txt(d.nome_guerra);
             document.getElementById('visPosto').innerText = txt(d.posto_grad);
             document.getElementById('visNumero').innerText = txt(d.numero);
             document.getElementById('visNomeCompleto').innerText = txt(d.nome_completo);
@@ -472,7 +642,11 @@ async function abrirModalLeitura(id) {
             const data = (dt) => (dt && dt.length === 10) ? dt.split('-').reverse().join('/') : '---';
 
             document.getElementById('f_foto').src = d.foto_path ? `uploads/${d.foto_path}` : 'assets/sem_foto.png';
-            document.getElementById('f_posto').innerText = txt(d.posto_grad);
+            
+            const isDesligado = d.status_ativo == 0;
+            const aviso = isDesligado ? '<span class="badge bg-danger fs-6 me-2 align-text-bottom">DESLIGADO</span>' : '';
+            document.getElementById('f_posto').innerHTML = aviso + txt(d.posto_grad);
+            
             document.getElementById('f_guerra').innerText = txt(d.nome_guerra);
             document.getElementById('f_nome_completo').innerText = txt(d.nome_completo);
             document.getElementById('f_su').innerText = txt(d.subunidade);
@@ -497,49 +671,51 @@ async function abrirModalLeitura(id) {
             document.getElementById('f_resp_nome').innerText = txt(d.nome_resp);
             document.getElementById('f_resp_tel').innerText = txt(d.tel_resp);
 
-            // AQUI É A LÓGICA DO PDF DA CNH
             document.getElementById('f_cnh_cat').innerHTML = txt(d.cat_cnh) + (d.pdf_habilitacao ? ` <a href="uploads/documentos/${d.pdf_habilitacao}" target="_blank" class="text-danger ms-2"><i class="fas fa-file-pdf fa-lg"></i></a>` : '');
             document.getElementById('f_cnh_val').innerText = data(d.validade_cnh);
             
-            // CARREGA MÚLTIPLOS VEÍCULOS DINAMICAMENTE NA FICHA DE LEITURA
-            const resVeic = await fetch(`backend/get_veiculos.php?militar_id=${id}&v=${Date.now()}`);
-            const jsonVeic = await resVeic.json();
-            
-            const fStatus = document.getElementById('f_status');
-            const fPlaca = document.getElementById('f_placa');
-            const fModelo = document.getElementById('f_modelo');
-            const fCor = document.getElementById('f_cor');
-            const fCrlv = document.getElementById('f_crlv');
+            try {
+                const resVeic = await fetch(`backend/get_veiculos.php?militar_id=${id}&v=${Date.now()}`);
+                const jsonVeic = await resVeic.json();
+                
+                const areaVeiculos = document.getElementById('f_lista_veiculos');
+                if (areaVeiculos) {
+                    areaVeiculos.innerHTML = '';
+                    if (jsonVeic.status === 'sucesso' && jsonVeic.dados.length > 0) {
+                        jsonVeic.dados.forEach(v => {
+                            const badgeStatus = v.homologado == 1 ? '<span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> LIBERADO</span>' : '<span class="badge bg-warning text-dark"><i class="fas fa-clock me-1"></i> PENDENTE</span>';
+                            const obsS2 = v.observacao_s2 ? `<div class="text-danger small mt-1 fw-bold"><i class="fas fa-exclamation-triangle"></i> S2: ${v.observacao_s2}</div>` : '';
+                            const docCrlv = v.pdf_veiculo ? `<a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="text-danger ms-2" title="Visualizar Documento"><i class="fas fa-file-pdf"></i> PDF</a>` : '';
+                            const dataCrlv = v.validade_crlv ? v.validade_crlv.split('-').reverse().join('/') : '---';
+                            const nomeVeiculo = `${v.marca ? v.marca + ' / ' : ''}${v.modelo}`;
 
-            if(jsonVeic.status === 'sucesso' && jsonVeic.dados.length > 0) {
-                let vHtmlPlaca = ''; let vHtmlModelo = ''; let vHtmlCor = ''; let vHtmlCrlv = ''; let vHtmlStatus = '';
-                
-                jsonVeic.dados.forEach(v => {
-                    vHtmlPlaca += `<div class="bg-light border border-dark rounded text-center fw-bold font-monospace py-1 mb-1">${v.placa}</div>`;
-                    vHtmlModelo += `<div class="fw-bold pt-1 mb-1 text-truncate">${v.marca ? v.marca + ' / ' : ''}${v.modelo}</div>`;
-                    vHtmlCor += `<div class="fw-bold pt-1 mb-1">${v.cor}</div>`;
-                    
-                    const crlvDoc = v.pdf_veiculo ? ` <a href="uploads/documentos/${v.pdf_veiculo}" target="_blank" class="text-danger ms-2" title="Ver PDF"><i class="fas fa-file-pdf"></i></a>` : '';
-                    vHtmlCrlv += `<div class="fw-bold pt-1 mb-1">${v.validade_crlv ? v.validade_crlv.split('-').reverse().join('/') : '---'}${crlvDoc}</div>`;
-                    
-                    vHtmlStatus += `<div class="pt-1 mb-1">${v.homologado == 1 ? '<span class="badge bg-success">LIBERADO</span>' : '<span class="badge bg-warning text-dark">PENDENTE</span>'}</div>`;
-                });
-                
-                if (fPlaca) fPlaca.innerHTML = vHtmlPlaca;
-                if (fModelo) fModelo.innerHTML = vHtmlModelo;
-                if (fCor) fCor.innerHTML = vHtmlCor;
-                if (fCrlv) fCrlv.innerHTML = vHtmlCrlv;
-                if (fStatus) fStatus.innerHTML = vHtmlStatus;
-            } else {
-                if (fPlaca) fPlaca.innerHTML = '<span class="badge bg-light text-muted border p-1">S/ VEÍCULO</span>';
-                if (fModelo) fModelo.innerHTML = '---';
-                if (fCor) fCor.innerHTML = '---';
-                if (fCrlv) fCrlv.innerHTML = '---';
-                if (fStatus) fStatus.innerHTML = '---';
+                            areaVeiculos.innerHTML += `
+                            <div class="col-md-6 mb-2">
+                                <div class="border rounded p-2 bg-light h-100">
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <span class="bg-white border border-dark rounded text-center fw-bold font-monospace px-2 py-1 fs-6 text-uppercase">${v.placa}</span>
+                                        ${badgeStatus}
+                                    </div>
+                                    <div class="fw-bold text-dark text-uppercase text-truncate" title="${nomeVeiculo}">${nomeVeiculo}</div>
+                                    <div class="small text-muted mb-1">Cor: <strong>${v.cor}</strong></div>
+                                    <div class="small text-muted">CRLV: <strong>${dataCrlv}</strong> ${docCrlv}</div>
+                                    ${obsS2}
+                                </div>
+                            </div>
+                        `;
+                        });
+                    } else {
+                        areaVeiculos.innerHTML = '<div class="col-12"><div class="alert alert-secondary py-2 small text-center mb-0">Nenhum veículo cadastrado.</div></div>';
+                    }
+                }
+
+                new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
+            } catch (e) {
+                console.error(e);
+                alert("Erro de conexão ao buscar dados.");
+            } finally {
+                document.body.style.cursor = 'default';
             }
-
-            new bootstrap.Modal(document.getElementById('modalFichaLeitura')).show();
-
         } else {
             alert("Erro: " + json.msg);
         }
@@ -569,17 +745,25 @@ function aplicarPermissoes(role) {
     const adminBtn = document.getElementById('btnAdminUsers');
     const display = document.getElementById('displayUserRole');
     const formCard = document.getElementById('fullRegistrationCard'); 
+    const btnRelatorio = document.getElementById('btnRelatorioS2'); // Captura o novo botão
 
     if (display) display.innerText = role.toUpperCase();
     const r = role ? role.toLowerCase() : '';
 
+    if (btnRelatorio) btnRelatorio.classList.add('hidden');
+
     if (r === 'admin') {
         if (adminBtn) adminBtn.classList.remove('hidden');
         if (formCard) formCard.classList.remove('hidden'); 
+        if (btnRelatorio) btnRelatorio.classList.remove('hidden'); 
         carregarListaUsuarios();
     } else if (r === 'sargenteacao') {
         if (adminBtn) adminBtn.classList.add('hidden');
         if (formCard) formCard.classList.remove('hidden'); 
+    } else if (r === 's2' || r === 'transporte') {
+        if (adminBtn) adminBtn.classList.add('hidden');
+        if (btnRelatorio) btnRelatorio.classList.remove('hidden'); 
+        if (formCard) formCard.classList.add('hidden'); 
     } else {
         if (adminBtn) adminBtn.classList.add('hidden');
         if (formCard) formCard.classList.add('hidden');
@@ -587,7 +771,72 @@ function aplicarPermissoes(role) {
 }
 
 function previewImage(input) { if (input.files && input.files[0]) { var reader = new FileReader(); reader.onload = function (e) { document.getElementById('imgPreview').src = e.target.result; }; reader.readAsDataURL(input.files[0]); } }
-function atualizarDashboard() { fetch('backend/dashboard_stats.php').then(r => r.json()).then(j => { if (j.status === 'sucesso') { document.getElementById('dashMilitares').innerText = j.militares; document.getElementById('dashVeiculos').innerText = j.veiculos; document.getElementById('dashPendentes').innerText = j.pendentes; document.getElementById('dashboardPanel').classList.remove('hidden'); } }) }
+function atualizarDashboard() { 
+    fetch('backend/dashboard_stats.php')
+    .then(r => r.json())
+    .then(j => { 
+        if (j.status === 'sucesso') { 
+            // Atualiza os contadores principais
+            document.getElementById('dashMilitares').innerText = j.militares; 
+            document.getElementById('dashVeiculos').innerText = j.veiculos; 
+            document.getElementById('dashPendentes').innerText = j.pendentes; 
+            
+            const areaEfetivo = document.getElementById('dashEfetivoDetalhado');
+            const labelTotalSU = document.getElementById('dashTotalSU');
+            
+            if (areaEfetivo && j.efetivo_su) {
+                let contagemSU = 0;
+                let cartoesHtml = '';
+                
+                for (const [su, dados] of Object.entries(j.efetivo_su)) {
+                    contagemSU++;
+                    
+                    // Grelha interna com o padrão visual do SISMIL (linhas pontilhadas e texto secundário)
+                    let linhasTabela = dados.detalhes.map(d => `
+                        <div class="d-flex justify-content-between align-items-center py-1" style="border-bottom: 1px dashed rgba(0,0,0,0.1);">
+                            <span class="fw-bold text-secondary" style="font-size: 0.85rem;">${d.posto}</span>
+                            <span class="badge bg-light text-dark border shadow-sm" style="min-width: 32px;">${d.qtd}</span>
+                        </div>
+                    `).join('');
+                    
+                    // Cartão com borda superior no verde do Exército e fundo branco limpo
+                    cartoesHtml += `
+                        <div class="col-md-6 col-lg-4">
+                            <div class="card border-0 shadow-sm h-100" style="border-radius: 6px; border-top: 4px solid var(--army-green) !important; background-color: #fff;">
+                                <div class="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-center p-3 pb-2">
+                                    <h6 class="mb-0 fw-bold text-dark text-uppercase" style="letter-spacing: 0.5px;">
+                                        <i class="fas fa-shield-alt me-2" style="color: var(--army-green);"></i> ${su}
+                                    </h6>
+                                    <span class="badge bg-success shadow-sm">
+                                        <i class="fas fa-check-circle me-1"></i> ${dados.total} PRONTO
+                                    </span>
+                                </div>
+                                <div class="card-body px-3 pt-0 pb-3" style="max-height: 250px; overflow-y: auto;">
+                                    <div class="d-flex justify-content-between mb-2 pb-1" style="border-bottom: 2px solid #e9ecef;">
+                                        <span class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Posto / Grad</span>
+                                        <span class="text-muted text-uppercase fw-bold" style="font-size: 0.7rem;">Efetivo</span>
+                                    </div>
+                                    ${linhasTabela}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (contagemSU === 0) {
+                    areaEfetivo.innerHTML = '<div class="col-12 text-center text-muted py-5"><i class="fas fa-folder-open fa-3x mb-3 opacity-25"></i><br>Nenhum efetivo cadastrado.</div>';
+                } else {
+                    areaEfetivo.innerHTML = cartoesHtml;
+                }
+
+                if(labelTotalSU) labelTotalSU.innerText = `${contagemSU} Subunidades`;
+            }
+
+            document.getElementById('dashboardPanel').classList.remove('hidden'); 
+        } 
+    })
+    .catch(err => console.error("Erro ao carregar dashboard:", err));
+}
 async function realizarLogout() { await fetch('backend/logout.php'); location.reload(); }
 
 async function carregarListaUsuarios() {
@@ -620,23 +869,18 @@ function limparFormulario() {
     if (document.getElementById('militarId')) document.getElementById('militarId').value = '';
     if (document.getElementById('imgPreview')) document.getElementById('imgPreview').src = 'assets/sem_foto.png';
 
-    const btnExcluir = document.getElementById('btnExcluir');
-    if (btnExcluir) btnExcluir.classList.add('d-none');
-
     const card = document.getElementById('fullRegistrationCard');
     if (card) card.classList.add('hidden');
 
     const footerBtns = document.getElementById('formFooterButtons');
     if (footerBtns) {
         footerBtns.innerHTML = `
-            <button type="button" id="btnExcluir" class="btn btn-outline-danger d-none" onclick="excluirMilitar()">
-                <i class="fas fa-trash-alt me-1"></i> Excluir Cadastro
-            </button>
-            <div>
-                <button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Limpar</button>
-                <button type="submit" class="btn btn-success">
-                    <i class="fas fa-save me-1"></i> Salvar Dados
-                </button>
+            <div class="d-flex w-100 justify-content-between align-items-center">
+                <div></div>
+                <div>
+                    <button type="button" class="btn btn-outline-secondary me-2" onclick="limparFormulario()">Limpar / Cancelar</button>
+                    <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Salvar Dados</button>
+                </div>
             </div>
         `;
     }
@@ -646,8 +890,8 @@ function limparFormulario() {
         resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
+
 function imprimirSelo(id) {
-    // Agora o id passado é o ID do VEÍCULO, não mais do militar
     const width = 600; const height = 400;
     const left = (screen.width - width) / 2; const top = (screen.height - height) / 2;
     window.open(`backend/print_selo.php?veiculo_id=${id}`, 'ImprimirSelo', `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`);
@@ -668,7 +912,7 @@ async function excluirMilitar() {
 
     const result = await Swal.fire({
         title: 'Tem certeza?',
-        text: "Essa ação apagará o militar, seu histórico e toda a sua frota de veículos permanentemente!",
+        text: "Essa ação apagará permanentemente o militar, seu histórico e toda a sua frota de veículos! Use apenas se o cadastro foi um erro.",
         icon: 'warning',
         showCancelButton: true,
         confirmButtonColor: '#d33',
@@ -679,24 +923,15 @@ async function excluirMilitar() {
 
     if (result.isConfirmed) {
         try {
-            const res = await fetch('backend/delete_militar.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: id })
-            });
+            const res = await fetch('backend/delete_militar.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: id }) });
             const json = await res.json();
-
             if (json.status === 'sucesso') {
                 Swal.fire('Excluído!', 'O registro foi removido.', 'success');
                 limparFormulario();
                 atualizarDashboard();
                 atualizarListagem(); 
-            } else {
-                Swal.fire('Erro', json.msg, 'error');
-            }
-        } catch (e) {
-            Swal.fire('Erro', 'Erro de conexão.', 'error');
-        }
+            } else { Swal.fire('Erro', json.msg, 'error'); }
+        } catch (e) { Swal.fire('Erro', 'Erro de conexão.', 'error'); }
     }
 }
 
@@ -720,17 +955,11 @@ async function carregarHistoricoS1(idMilitar) {
                 const row = `
                     <tr>
                         <td style="white-space:nowrap;">${new Date(item.data_fato).toLocaleDateString('pt-BR')}</td>
-                        <td>
-                            <span class="badge ${corBadge}">${item.tipo_detalhe}</span>
-                        </td>
+                        <td><span class="badge ${corBadge}">${item.tipo_detalhe}</span></td>
                         <td class="text-truncate" style="max-width: 250px;" title="${item.descricao}">${item.descricao}</td>
                         <td class="text-end">
-                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1" onclick='prepararEdicaoS1(${item.id})'>
-                                <i class="fas fa-pencil-alt"></i>
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="excluirHistoricoS1(${item.id}, ${idMilitar})">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary py-0 px-1" onclick='prepararEdicaoS1(${item.id})'><i class="fas fa-pencil-alt"></i></button>
+                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1" onclick="excluirHistoricoS1(${item.id}, ${idMilitar})"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
                 `;
@@ -787,10 +1016,7 @@ async function salvarHistoricoS1() {
     const data = document.getElementById('s1_data').value;
     const desc = document.getElementById('s1_desc').value;
 
-    if (!cat || !tipo || !data || !desc) {
-        Swal.fire('Atenção', 'Preencha Categoria, Tipo, Data e Descrição.', 'warning');
-        return;
-    }
+    if (!cat || !tipo || !data || !desc) { Swal.fire('Atenção', 'Preencha Categoria, Tipo, Data e Descrição.', 'warning'); return; }
 
     const fd = new FormData();
     if (editId) fd.append('s1_edit_id', editId); 
@@ -808,18 +1034,10 @@ async function salvarHistoricoS1() {
     try {
         const res = await fetch(url, { method: 'POST', body: fd });
         const json = await res.json();
-
         if (json.status === 'sucesso') {
-            limparFormS1(); 
-            carregarHistoricoS1(idMilitar); 
-            Swal.fire({
-                toast: true, icon: 'success',
-                title: editId ? 'Atualizado!' : 'Salvo!',
-                position: 'top-end', showConfirmButton: false, timer: 1500
-            });
-        } else {
-            Swal.fire('Erro', json.msg || 'Erro desconhecido', 'error');
-        }
+            limparFormS1(); carregarHistoricoS1(idMilitar); 
+            Swal.fire({ toast: true, icon: 'success', title: editId ? 'Atualizado!' : 'Salvo!', position: 'top-end', showConfirmButton: false, timer: 1500 });
+        } else { Swal.fire('Erro', json.msg || 'Erro desconhecido', 'error'); }
     } catch (e) { console.error(e); }
 }
 
@@ -836,7 +1054,6 @@ function prepararEdicaoS1(item) {
     btn.innerHTML = 'Salvar Alteração';
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-warning');
-
     document.getElementById('btnCancelarS1').classList.remove('d-none');
 }
 
@@ -854,7 +1071,6 @@ function limparFormS1() {
     btn.innerHTML = 'Adicionar';
     btn.classList.add('btn-primary');
     btn.classList.remove('btn-warning');
-
     document.getElementById('btnCancelarS1').classList.add('d-none');
 }
 
@@ -863,7 +1079,6 @@ async function excluirHistoricoS1(idItem, idMilitar) {
     try {
         const res = await fetch('backend/excluir_alteracao.php', { method: 'POST', body: JSON.stringify({ id: idItem }) });
         const json = await res.json();
-
         if (json.status === 'sucesso') {
             carregarHistoricoS1(idMilitar);
             Swal.fire({ toast: true, icon: 'success', title: 'Excluído!', position: 'top-end', showConfirmButton: false, timer: 1500 });
@@ -873,29 +1088,11 @@ async function excluirHistoricoS1(idItem, idMilitar) {
 
 async function concederRecompensa() {
     const idMilitar = document.getElementById('s1_militar_id').value;
-
-    const result = await Swal.fire({
-        title: 'Conceder Recompensa?',
-        text: "O sistema irá consumir 5 Elogios (FO+) e gerar 1 Dispensa Recompensa automaticamente.",
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#ffc107',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Sim, conceder!',
-        cancelButtonText: 'Cancelar'
-    });
-
+    const result = await Swal.fire({ title: 'Conceder Recompensa?', text: "O sistema irá consumir 5 Elogios (FO+) e gerar 1 Dispensa Recompensa automaticamente.", icon: 'question', showCancelButton: true, confirmButtonColor: '#ffc107', cancelButtonColor: '#d33', confirmButtonText: 'Sim, conceder!', cancelButtonText: 'Cancelar' });
     if (!result.isConfirmed) return;
-
     try {
-        const res = await fetch('backend/conceder_recompensa.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ militar_id: idMilitar })
-        });
-
+        const res = await fetch('backend/conceder_recompensa.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ militar_id: idMilitar }) });
         const json = await res.json();
-
         if (json.status === 'sucesso') {
             await Swal.fire({ title: 'Recompensa Gerada!', text: 'Os elogios foram baixados e a dispensa foi lançada no histórico.', icon: 'success' });
             carregarHistoricoS1(idMilitar);

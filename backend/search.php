@@ -1,5 +1,5 @@
 <?php
-// ARQUIVO: backend/search.php (CORRIGIDO PARA ORDENAÇÃO MILITAR)
+// ARQUIVO: backend/search.php
 header('Content-Type: application/json; charset=utf-8');
 require 'db_connect.php';
 
@@ -9,8 +9,14 @@ $posto = $_GET['posto'] ?? '';
 $qmg = $_GET['qmg'] ?? '';
 $filtro_cnh = $_GET['filtro_cnh'] ?? 'TODAS';
 
+// Verifica se a S1 pediu para exibir os militares desligados
+$inativos = isset($_GET['inativos']) && $_GET['inativos'] == '1';
+
 try {
-    $sql = "SELECT * FROM tb_militares WHERE 1=1";
+    // Se a caixinha não estiver marcada, mostra APENAS os ativos (status_ativo = 1).
+    $statusFilter = $inativos ? "1=1" : "status_ativo = 1";
+    
+    $sql = "SELECT * FROM tb_militares WHERE $statusFilter";
     $params = [];
 
     // --- BUSCA GERAL ---
@@ -20,9 +26,8 @@ try {
                 $sql .= " AND numero = ?";
                 $params[] = $termo;
             } else {
-                $sql .= " AND (nome_guerra LIKE ? OR nome_completo LIKE ?)";
-                $params[] = "%$termo%";
-                $params[] = "%$termo%";
+                $sql .= " AND (nome_guerra LIKE ? OR nome_completo LIKE ? OR identidade LIKE ? OR idt_militar LIKE ?)";
+                $params = array_merge($params, ["%$termo%", "%$termo%", "%$termo%", "%$termo%"]);
             }
         }
         if (!empty($posto) && $posto !== 'Todos') {
@@ -46,7 +51,7 @@ try {
         }
     }
 
-    // --- AQUI ESTÁ A CORREÇÃO DA HIERARQUIA ---
+    // --- ORDENAÇÃO HIERÁRQUICA MILITAR ---
     $sql .= " ORDER BY 
         CASE posto_grad
             WHEN 'Gen Ex' THEN 1

@@ -38,6 +38,18 @@ try {
     elseif (in_array($posto, $graduados)) $cor_tema = '#0033cc'; // Azul
     else $cor_tema = '#006600'; // Verde
 
+    // Lógica da Validade (CRLV + 1 Ano)
+    if (!empty($m['validade_crlv'])) {
+        $nova_data = strtotime('+1 year', strtotime($m['validade_crlv']));
+        $meses = [1=>'JANEIRO', 2=>'FEVEREIRO', 3=>'MARÇO', 4=>'ABRIL', 5=>'MAIO', 6=>'JUNHO', 7=>'JULHO', 8=>'AGOSTO', 9=>'SETEMBRO', 10=>'OUTUBRO', 11=>'NOVEMBRO', 12=>'DEZEMBRO'];
+        $dia = date('d', $nova_data);
+        $mes = $meses[(int)date('m', $nova_data)];
+        $ano = date('Y', $nova_data);
+        $validade_texto = "VALIDADE: $dia DE $mes $ano";
+    } else {
+        $validade_texto = "VALIDADE: INDEFINIDA";
+    }
+
     // Formatação de variáveis para o layout original
     $placa = !empty($m['placa']) ? strtoupper($m['placa']) : 'SEM VEÍCULO';
     
@@ -141,7 +153,6 @@ try {
             padding-left: 20px;
             text-align: left;
             margin-top: auto;
-            margin-bottom: 15px;
         }
 
         .linha-dado {
@@ -156,6 +167,18 @@ try {
             font-size: 15px;
             font-weight: 500;
             color: #333;
+        }
+
+        /* Nova classe para a validade centralizada na parte inferior */
+        .validade-footer {
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 900;
+            color: #000;
+            padding-bottom: 5px;
+            padding-top: 5px;
+            margin-top: auto; /* Empurra para o fundo do cartão */
         }
 
         .no-print {
@@ -196,6 +219,8 @@ try {
                 <div class="linha-dado"><?php echo $identificacao; ?></div>
                 <div class="linha-fone"><?php echo $telefone; ?></div>
             </div>
+
+            <div class="validade-footer"><?php echo $validade_texto; ?></div>
         </div>
     </div>
 
